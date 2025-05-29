@@ -43,6 +43,7 @@ export default function LinguaCheckPage() {
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [parsedParagraphs, setParsedParagraphs] = useState<ParagraphItem[]>([]);
   const [isFileProcessing, setIsFileProcessing] = useState<boolean>(false);
+  const [isCheckingAll, setIsCheckingAll] = useState<boolean>(false); // New state for "Check All"
 
   const { toast } = useToast();
 
@@ -50,7 +51,7 @@ export default function LinguaCheckPage() {
     if (!apiResponse || inputText === "") {
       setUserModifiedText(inputText);
     }
-  }, [inputText]);
+  }, [inputText, apiResponse]); // Added apiResponse to dependencies
 
   const handleMainSubmit = async () => {
     if (!inputText.trim()) {
@@ -64,7 +65,7 @@ export default function LinguaCheckPage() {
 
     setIsLoading(true);
     setApiResponse(null);
-    setParsedParagraphs([]); // Clear any file upload results
+    setParsedParagraphs([]); 
     setUploadedFileName(null);
     setUserModifiedText(inputText);
 
@@ -72,6 +73,10 @@ export default function LinguaCheckPage() {
       const input: CheckContentErrorsInput = { content: inputText, language: selectedLanguage };
       const result = await checkContentErrors(input);
       setApiResponse(result);
+      // Update userModifiedText only if AI provides corrected content
+      if (result.correctedContent) {
+        setUserModifiedText(result.correctedContent);
+      }
       toast({
         title: "Check Complete",
         description: "Errors and suggestions are now available for the text input.",
@@ -105,8 +110,8 @@ export default function LinguaCheckPage() {
 
     setIsFileProcessing(true);
     setUploadedFileName(file.name);
-    setInputText(""); // Clear main text area
-    setApiResponse(null); // Clear main text area results
+    setInputText(""); 
+    setApiResponse(null); 
     setParsedParagraphs([]);
 
     try {
@@ -125,7 +130,7 @@ export default function LinguaCheckPage() {
           isLoading: false,
           userModifiedText: p.textContent?.trim() || '',
         }))
-        .filter(p => p.originalText.length > 0); // Filter out empty paragraphs
+        .filter(p => p.originalText.length > 0);
 
       if (paragraphs.length === 0) {
         toast({
@@ -138,7 +143,7 @@ export default function LinguaCheckPage() {
         setParsedParagraphs(paragraphs);
         toast({
           title: "File Processed",
-          description: `Found ${paragraphs.length} paragraph(s) in ${file.name}. You can now check them individually.`,
+          description: `Found ${paragraphs.length} paragraph(s) in ${file.name}. You can now check them.`,
         });
       }
     } catch (error) {
@@ -151,7 +156,6 @@ export default function LinguaCheckPage() {
       setUploadedFileName(null);
     } finally {
       setIsFileProcessing(false);
-      // Reset file input to allow uploading the same file again if needed
       event.target.value = ""; 
     }
   };
@@ -161,6 +165,7 @@ export default function LinguaCheckPage() {
     if (paragraphIndex === -1) return;
 
     const paragraph = parsedParagraphs[paragraphIndex];
+    if (paragraph.isLoading || paragraph.apiResponse) return; // Don't re-check if already loading or checked
 
     setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, isLoading: true, apiResponse: undefined } : p));
 
@@ -169,24 +174,67 @@ export default function LinguaCheckPage() {
       const result = await checkContentErrors(input);
       setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, isLoading: false, apiResponse: result, userModifiedText: result.correctedContent } : p));
       toast({
-        title: `Paragraph ${paragraphIndex + 1} Checked`, // Corrected index usage
+        title: `Paragraph ${paragraphIndex + 1} Checked`,
         description: "Errors and suggestions are available for this paragraph.",
       });
     } catch (error) {
       console.error(`Error checking paragraph ${paragraphId}:`, error);
       toast({
-        title: `Error Checking Paragraph ${paragraphIndex + 1}`, // Corrected index usage
+        title: `Error Checking Paragraph ${paragraphIndex + 1}`,
         description: "Failed to check this paragraph. Please try again.",
         variant: "destructive",
       });
       setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, isLoading: false } : p));
     }
   };
+
+  const handleCheckAllParagraphs = async () => {
+    if (!parsedParagraphs.some(p => !p.apiResponse && !p.isLoading)) {
+      toast({
+        title: "All Checked",
+        description: "All paragraphs have already been checked or are currently being processed.",
+      });
+      return;
+    }
+
+    setIsCheckingAll(true);
+    toast({
+      title: "Processing All Paragraphs",
+      description: "Checking all unchecked paragraphs. This may take some time.",
+    });
+
+    for (const para of parsedParagraphs) { // Use a copy of parsedParagraphs at the start of the loop
+        if (!para.apiResponse && !para.isLoading) {
+            setParsedParagraphs(prev => prev.map(p => p.id === para.id ? { ...p, isLoading: true, apiResponse: undefined } : p));
+            try {
+                const input: CheckContentErrorsInput = { content: para.originalText, language: selectedLanguage };
+                const result = await checkContentErrors(input);
+                setParsedParagraphs(prev => prev.map(p =>
+                    p.id === para.id ? { ...p, isLoading: false, apiResponse: result, userModifiedText: result.correctedContent } : p
+                ));
+            } catch (error) {
+                console.error(`Error checking paragraph ${para.id} during 'Check All':`, error);
+                const paragraphIndex = parsedParagraphs.findIndex(p => p.id === para.id);
+                toast({
+                    title: `Error Checking Paragraph ${paragraphIndex + 1}`,
+                    description: "Failed to check this paragraph. Skipping.",
+                    variant: "destructive",
+                });
+                setParsedParagraphs(prev => prev.map(p => p.id === para.id ? { ...p, isLoading: false } : p));
+            }
+        }
+    }
+
+    setIsCheckingAll(false);
+    toast({
+        title: "Processing Complete",
+        description: "All paragraphs have been processed.",
+    });
+  };
   
   const handleParagraphTextChange = (paragraphId: string, newText: string) => {
     setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, userModifiedText: newText } : p));
   };
-
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background text-foreground font-sans">
@@ -203,19 +251,17 @@ export default function LinguaCheckPage() {
       </header>
 
       <div className="flex flex-col md:flex-row gap-4 md:gap-6 flex-grow">
-        {/* Left Panel: Input & File Upload */}
         <Card className="md:w-1/2 w-full flex flex-col shadow-xl border-border">
           <CardHeader className="pb-4">
             <CardTitle className="text-xl md:text-2xl flex items-center gap-2">
               <LanguagesIcon className="h-5 w-5 md:h-6 md:w-6 text-primary" />
               Input Options
             </CardTitle>
-            <CardDescription className="text-sm">Paste text or upload a DOCX file.</CardDescription>
+            <CardDescription className="text-sm">Paste text or upload a DOCX file. Select language below.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 flex-grow">
-            {/* Language Selector - Common for both methods */}
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-center">
-                <Select value={selectedLanguage} onValueChange={(value: LanguageValue) => setSelectedLanguage(value)}>
+                <Select value={selectedLanguage} onValueChange={(value: LanguageValue) => setSelectedLanguage(value)} disabled={isLoading || isFileProcessing || isCheckingAll}>
                   <SelectTrigger className="w-full sm:w-auto sm:flex-grow-[0.5] bg-card border-input focus:ring-primary">
                     <SelectValue placeholder="Select language" />
                   </SelectTrigger>
@@ -229,18 +275,18 @@ export default function LinguaCheckPage() {
                 </Select>
               </div>
             
-            {/* Manual Text Input */}
             <div className="border p-4 rounded-md bg-card/50">
               <label htmlFor="manual-text-input" className="block text-sm font-medium text-muted-foreground mb-1">Enter Text Manually:</label>
               <Textarea
                 id="manual-text-input"
                 placeholder="Start typing or paste your content here..."
                 value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
+                onChange={(e) => { setInputText(e.target.value); setUploadedFileName(null); setParsedParagraphs([]); setApiResponse(null);}}
                 className="flex-grow min-h-[150px] sm:min-h-[200px] text-base bg-card border-input focus:ring-primary"
                 rows={8}
+                disabled={isFileProcessing || isCheckingAll}
               />
-              <Button onClick={handleMainSubmit} disabled={isLoading || isFileProcessing} className="w-full mt-3 text-base py-3">
+              <Button onClick={handleMainSubmit} disabled={isLoading || isFileProcessing || isCheckingAll || !inputText.trim()} className="w-full mt-3 text-base py-3">
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -252,7 +298,6 @@ export default function LinguaCheckPage() {
               </Button>
             </div>
             
-            {/* File Upload */}
             <div className="border p-4 rounded-md bg-card/50">
               <label htmlFor="file-upload-input" className="block text-sm font-medium text-muted-foreground mb-1">Or Upload DOCX File:</label>
               <div className="flex items-center gap-3">
@@ -261,7 +306,7 @@ export default function LinguaCheckPage() {
                   type="file"
                   accept=".docx"
                   onChange={handleFileUpload}
-                  disabled={isFileProcessing || isLoading}
+                  disabled={isFileProcessing || isLoading || isCheckingAll}
                   className="flex-grow file:mr-2 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer"
                 />
               </div>
@@ -271,12 +316,15 @@ export default function LinguaCheckPage() {
                   Processing document...
                 </div>
               )}
+               {uploadedFileName && !isFileProcessing && parsedParagraphs.length > 0 && (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Processed: <span className="font-medium text-foreground">{uploadedFileName}</span> ({parsedParagraphs.length} paragraphs)
+                </p>
+              )}
             </div>
-
           </CardContent>
         </Card>
 
-        {/* Right Panel: Output */}
         <Card className="md:w-1/2 w-full flex flex-col shadow-xl border-border">
           <CardHeader className="pb-4">
             <CardTitle className="text-xl md:text-2xl flex items-center gap-2">
@@ -285,11 +333,26 @@ export default function LinguaCheckPage() {
             </CardTitle>
             <CardDescription className="text-sm">
               {apiResponse || parsedParagraphs.length > 0 ? "Review suggestions or view the AI-corrected text." : "Results will appear here after checking."}
-              {uploadedFileName && ` Showing results for: ${uploadedFileName}`}
+              {uploadedFileName && parsedParagraphs.length === 0 && apiResponse === null && ` Showing results for: ${uploadedFileName}`}
             </CardDescription>
+            {parsedParagraphs.length > 0 && (
+              <Button
+                onClick={handleCheckAllParagraphs}
+                disabled={isLoading || isFileProcessing || isCheckingAll || !parsedParagraphs.some(p => !p.apiResponse && !p.isLoading)}
+                className="mt-2 w-full sm:w-auto"
+              >
+                {isCheckingAll ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Checking All...
+                  </>
+                ) : (
+                  "Check All Paragraphs"
+                )}
+              </Button>
+            )}
           </CardHeader>
           <CardContent className="flex-grow">
-            {/* Loading state for main text input */}
             {isLoading && !apiResponse && parsedParagraphs.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4">
                 <Loader2 className="h-10 w-10 md:h-12 md:w-12 animate-spin text-primary mb-4" />
@@ -298,7 +361,6 @@ export default function LinguaCheckPage() {
               </div>
             )}
 
-            {/* Placeholder for when nothing is loaded (neither main text nor file) */}
             {!isLoading && !apiResponse && parsedParagraphs.length === 0 && !isFileProcessing && (
                <div className="flex flex-col items-center justify-center h-full text-center p-4 rounded-lg border-2 border-dashed border-input">
                  <Image src="https://placehold.co/200x150.png" alt="Placeholder illustration" width={200} height={150} className="opacity-60 rounded mb-4" data-ai-hint="analysis document" />
@@ -307,7 +369,6 @@ export default function LinguaCheckPage() {
                </div>
             )}
             
-            {/* Display for main text area results */}
             {apiResponse && parsedParagraphs.length === 0 && (
               <Tabs defaultValue="interactive" className="w-full h-full flex flex-col">
                 <TabsList className="grid w-full grid-cols-2">
@@ -333,9 +394,8 @@ export default function LinguaCheckPage() {
               </Tabs>
             )}
 
-            {/* Display for parsed paragraphs from DOCX */}
             {parsedParagraphs.length > 0 && (
-              <ScrollArea className="h-[calc(100%-0px)] pr-3"> {/* Adjust height as needed */}
+              <ScrollArea className="h-[calc(100%-40px)] pr-3 mt-2"> {/* Adjusted height if Check All button is above */}
                 <Accordion type="multiple" className="w-full space-y-2">
                   {parsedParagraphs.map((para, index) => (
                     <AccordionItem value={para.id} key={para.id} className="border bg-card/50 rounded-md shadow">
@@ -345,29 +405,29 @@ export default function LinguaCheckPage() {
                           <p className="text-sm text-muted-foreground truncate flex-grow text-left DDLM_IGNORED">
                              {para.originalText.substring(0,80)}{para.originalText.length > 80 ? '...' : ''}
                           </p>
-                          {!para.apiResponse && !para.isLoading && (
-                             <Button 
-                                asChild // Added asChild prop
-                                size="sm" 
+                          <div className="ml-auto flex-shrink-0">
+                            {para.isLoading ? (
+                              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                            ) : para.apiResponse ? (
+                              <FileCheck2 className="h-5 w-5 text-green-500" />
+                            ) : (
+                              <Button
+                                size="sm"
                                 variant="outline"
                                 onClick={(e) => { 
                                   e.stopPropagation(); 
-                                  if (!isFileProcessing) { // Ensure not disabled before calling
-                                    handleCheckParagraph(para.id); 
-                                  }
-                                }} 
-                                className="ml-auto flex-shrink-0"
-                                disabled={isFileProcessing}
+                                  handleCheckParagraph(para.id); 
+                                }}
+                                disabled={isFileProcessing || isCheckingAll}
                               >
-                                <span>Check</span> 
+                                Check
                               </Button>
-                          )}
-                          {para.isLoading && <Loader2 className="h-5 w-5 animate-spin text-primary ml-auto flex-shrink-0" />}
-                           {para.apiResponse && <FileCheck2 className="h-5 w-5 text-green-500 ml-auto flex-shrink-0" />}
+                            )}
+                          </div>
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="px-4 pb-4 pt-0">
-                        {para.isLoading && !para.apiResponse && (
+                        {(para.isLoading && !para.apiResponse) && ( // Show loading indicator only if apiResponse is not yet there
                           <div className="flex items-center justify-center py-6">
                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
                             <p className="ml-2 text-muted-foreground">Checking paragraph...</p>
@@ -401,7 +461,7 @@ export default function LinguaCheckPage() {
                             <div className="text-sm text-muted-foreground py-4 border-t mt-2">
                                 <p>Original Text:</p>
                                 <p className="whitespace-pre-wrap p-2 bg-background/30 rounded mt-1">{para.originalText}</p>
-                                Click "Check" to analyze this paragraph.
+                                Click "Check" to analyze this paragraph or "Check All Paragraphs" above.
                             </div>
                         )}
                       </AccordionContent>
@@ -419,6 +479,3 @@ export default function LinguaCheckPage() {
     </div>
   );
 }
-
-
-    
