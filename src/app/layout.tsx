@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Deepak Text Editor',
-  description: 'A simple tool for drafting and editing text content.',
+  title: 'Deepak Checker AI: AI-Powered Content Checker',
+  description: 'An AI-powered tool for drafting, checking grammar, getting content suggestions, and editing text content, including DOCX file support.',
 };
 
 export default function RootLayout({
