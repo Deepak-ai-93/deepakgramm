@@ -4,7 +4,7 @@
 import { useState, useEffect, ChangeEvent } from 'react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input"; // Corrected this line
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -169,13 +169,13 @@ export default function LinguaCheckPage() {
       const result = await checkContentErrors(input);
       setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, isLoading: false, apiResponse: result, userModifiedText: result.correctedContent } : p));
       toast({
-        title: `Paragraph ${index + 1} Checked`,
+        title: `Paragraph ${paragraphIndex + 1} Checked`, // Corrected index usage
         description: "Errors and suggestions are available for this paragraph.",
       });
     } catch (error) {
       console.error(`Error checking paragraph ${paragraphId}:`, error);
       toast({
-        title: `Error Checking Paragraph ${paragraphIndex + 1}`,
+        title: `Error Checking Paragraph ${paragraphIndex + 1}`, // Corrected index usage
         description: "Failed to check this paragraph. Please try again.",
         variant: "destructive",
       });
@@ -347,13 +347,19 @@ export default function LinguaCheckPage() {
                           </p>
                           {!para.apiResponse && !para.isLoading && (
                              <Button 
+                                asChild // Added asChild prop
                                 size="sm" 
                                 variant="outline"
-                                onClick={(e) => { e.stopPropagation(); handleCheckParagraph(para.id); }} 
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  if (!isFileProcessing) { // Ensure not disabled before calling
+                                    handleCheckParagraph(para.id); 
+                                  }
+                                }} 
                                 className="ml-auto flex-shrink-0"
                                 disabled={isFileProcessing}
                               >
-                                Check
+                                <span>Check</span> 
                               </Button>
                           )}
                           {para.isLoading && <Loader2 className="h-5 w-5 animate-spin text-primary ml-auto flex-shrink-0" />}
@@ -413,3 +419,6 @@ export default function LinguaCheckPage() {
     </div>
   );
 }
+
+
+    
