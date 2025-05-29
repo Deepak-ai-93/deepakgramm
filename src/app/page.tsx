@@ -11,8 +11,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { InteractiveCorrector } from "@/components/linguacheck/InteractiveCorrector";
 import { checkContentErrors, CheckContentErrorsInput, CheckContentErrorsOutput } from "@/ai/flows/check-content-errors";
+import { suggestContent, SuggestContentInput, SuggestContentOutput } from "@/ai/flows/suggest-content-flow"; // Import new flow
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LanguagesIcon, FileText, UploadCloud, FileCheck2, BrainCircuit } from "lucide-react";
+import { Loader2, LanguagesIcon, FileText, UploadCloud, FileCheck2, BrainCircuit, Lightbulb } from "lucide-react";
 import Image from 'next/image';
 import mammoth from 'mammoth'; // Keep for potential future re-enablement
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -41,70 +42,108 @@ const BASE_PAGE_TITLE = 'Deepak Checker AI: AI-Powered Content Checker';
 export default function LinguaCheckPage() {
   const [inputText, setInputText] = useState<string>("");
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageValue>('english');
-  const [isLoading, setIsLoading] = useState<boolean>(false); // For main text area
-  const [apiResponse, setApiResponse] = useState<CheckContentErrorsOutput | null>(null); // For main text area
-  const [userModifiedText, setUserModifiedText] = useState<string>(""); // For main text area
+  
+  // States for grammar check
+  const [isLoadingGrammar, setIsLoadingGrammar] = useState<boolean>(false);
+  const [grammarApiResponse, setGrammarApiResponse] = useState<CheckContentErrorsOutput | null>(null);
+  const [userModifiedText, setUserModifiedText] = useState<string>("");
+
+  // States for content suggestions
+  const [isSuggestingContent, setIsSuggestingContent] = useState<boolean>(false);
+  const [contentSuggestions, setContentSuggestions] = useState<string[] | null>(null);
+
 
   // DOCX related states - keep for easier re-integration, but they won't be populated by UI
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [parsedParagraphs, setParsedParagraphs] = useState<ParagraphItem[]>([]);
   const [isFileProcessing, setIsFileProcessing] = useState<boolean>(false);
   const [isCheckingAll, setIsCheckingAll] = useState<boolean>(false);
-  // isAiAssistanceEnabled state is removed as the toggle is hidden. AI is effectively always on for manual input.
 
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!apiResponse || inputText === "") {
+    if (!grammarApiResponse || inputText === "") {
       setUserModifiedText(inputText);
     }
-  }, [inputText, apiResponse]);
+  }, [inputText, grammarApiResponse]);
 
   useEffect(() => {
     // AI assistance is now always on for manual input, so always show brain icon
     document.title = '🧠 ' + BASE_PAGE_TITLE;
   }, []);
 
-  const handleMainSubmit = async () => {
-    // AI assistance toggle check removed
+  const handleGrammarCheckSubmit = async () => {
     if (!inputText.trim()) {
       toast({
         title: "Input Required",
-        description: "Please enter some text to check.",
+        description: "Please enter some text to check for grammar.",
         variant: "destructive",
       });
       return;
     }
 
-    setIsLoading(true);
-    setApiResponse(null);
+    setIsLoadingGrammar(true);
+    setGrammarApiResponse(null);
+    setUserModifiedText(inputText); // Reset user modified text to current input before grammar check
     // No longer resetting DOCX states as that UI is hidden
-    // setParsedParagraphs([]);
-    // setUploadedFileName(null);
-    setUserModifiedText(inputText); 
+    //setContentSuggestions(null); // Optionally clear content suggestions or keep them
 
     try {
       const input: CheckContentErrorsInput = { content: inputText, language: selectedLanguage };
       const result = await checkContentErrors(input);
-      setApiResponse(result);
+      setGrammarApiResponse(result);
       if (result.correctedContent) {
         setUserModifiedText(result.correctedContent);
       }
       toast({
-        title: "Check Complete",
+        title: "Grammar Check Complete",
         description: "Errors and suggestions are now available for the text input.",
       });
     } catch (error) {
-      console.error("Error checking content:", error);
+      console.error("Error checking grammar:", error);
       toast({
         title: "Error",
-        description: "Failed to check content. Please try again.",
+        description: "Failed to check grammar. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsLoadingGrammar(false);
     }
   };
+
+  const handleSuggestContentSubmit = async () => {
+    if (!inputText.trim()) {
+      toast({
+        title: "Input Required",
+        description: "Please enter some text to get content suggestions.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSuggestingContent(true);
+    setContentSuggestions(null);
+    setGrammarApiResponse(null); // Clear previous grammar results if getting new suggestions
+    
+    try {
+      const input: SuggestContentInput = { content: inputText, language: selectedLanguage };
+      const result = await suggestContent(input);
+      setContentSuggestions(result.suggestions);
+      toast({
+        title: "Content Suggestions Ready",
+        description: "AI has generated some content ideas for you.",
+      });
+    } catch (error) {
+      console.error("Error suggesting content:", error);
+      toast({
+        title: "Error",
+        description: "Failed to get content suggestions. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSuggestingContent(false);
+    }
+  };
+
 
   // DOCX related functions are kept for easier future re-integration but are not called by current UI
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -115,8 +154,9 @@ export default function LinguaCheckPage() {
     setIsFileProcessing(true);
     setUploadedFileName(file.name);
     setInputText(""); 
-    setApiResponse(null); 
+    setGrammarApiResponse(null); 
     setParsedParagraphs([]); 
+    setContentSuggestions(null);
 
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -248,7 +288,7 @@ export default function LinguaCheckPage() {
   };
 
   // Simplified as DOCX processing states are not triggered by UI
-  const anyOperationInProgress = isLoading || isFileProcessing || isCheckingAll;
+  const anyOperationInProgress = isLoadingGrammar || isFileProcessing || isCheckingAll || isSuggestingContent;
 
 
   return (
@@ -272,11 +312,10 @@ export default function LinguaCheckPage() {
               <LanguagesIcon className="h-5 w-5 md:h-6 md:w-6 text-primary" />
               Input Options
             </CardTitle>
-            <CardDescription className="text-sm">Select language and paste text for AI-powered checking.</CardDescription>
+            <CardDescription className="text-sm">Select language, paste text for AI suggestions & grammar checks.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 flex-grow">
             
-            {/* Placeholder for "Enable AI Assistance" switch and DOCX Upload */}
             <div className="border p-4 rounded-md bg-card/50 mb-4">
               <div className="flex items-center gap-2 mb-2">
                 <UploadCloud className="h-5 w-5 text-primary" />
@@ -284,7 +323,7 @@ export default function LinguaCheckPage() {
               </div>
               <p className="text-sm text-primary font-medium">Document Upload & Analysis: Coming Soon!</p>
               <p className="text-xs text-muted-foreground mt-1">
-                AI-powered checking for manually typed text (below) is currently active.
+                AI-powered suggestions and checking for manually typed text (below) is currently active.
               </p>
             </div>
             
@@ -292,7 +331,7 @@ export default function LinguaCheckPage() {
                 <Select 
                   value={selectedLanguage} 
                   onValueChange={(value: LanguageValue) => setSelectedLanguage(value)} 
-                  disabled={anyOperationInProgress} // No longer checks isAiAssistanceEnabled
+                  disabled={anyOperationInProgress}
                 >
                   <SelectTrigger className="w-full sm:w-auto sm:flex-grow-[0.5] bg-card border-input focus:ring-primary">
                     <SelectValue placeholder="Select language" />
@@ -313,28 +352,82 @@ export default function LinguaCheckPage() {
                 id="manual-text-input"
                 placeholder="Start typing or paste your content here..."
                 value={inputText}
-                onChange={(e) => { setInputText(e.target.value); setApiResponse(null); setUserModifiedText(e.target.value);}} // Removed DOCX state resets
+                onChange={(e) => { 
+                  setInputText(e.target.value); 
+                  setGrammarApiResponse(null); // Clear grammar results on new input
+                  setContentSuggestions(null); // Clear content suggestions on new input
+                  setUserModifiedText(e.target.value);
+                }}
                 className="flex-grow min-h-[150px] sm:min-h-[200px] text-base bg-card border-input focus:ring-primary"
                 rows={8}
                 disabled={anyOperationInProgress}
               />
-              <Button 
-                onClick={handleMainSubmit} 
-                disabled={anyOperationInProgress || !inputText.trim()}  // No longer checks isAiAssistanceEnabled
-                className="w-full mt-3 text-base py-3"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Checking Text...
-                  </>
-                ) : (
-                  "Check Typed Text"
-                )}
-              </Button>
+              <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                <Button 
+                  onClick={handleSuggestContentSubmit} 
+                  disabled={anyOperationInProgress || !inputText.trim()}
+                  className="w-full sm:w-1/2 text-base py-3"
+                  variant="outline"
+                >
+                  {isSuggestingContent ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Getting Suggestions...
+                    </>
+                  ) : (
+                    <>
+                      <Lightbulb className="mr-2 h-5 w-5" />
+                      Get Content Suggestions
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  onClick={handleGrammarCheckSubmit} 
+                  disabled={anyOperationInProgress || !inputText.trim()}
+                  className="w-full sm:w-1/2 text-base py-3"
+                >
+                  {isLoadingGrammar ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Checking Grammar...
+                    </>
+                  ) : (
+                     "Check Typed Text (Grammar)"
+                  )}
+                </Button>
+              </div>
             </div>
 
-            {/* DOCX File Upload section is removed */}
+            {isSuggestingContent && (
+                <div className="flex items-center justify-center text-muted-foreground mt-4">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                    <p>Generating content ideas...</p>
+                </div>
+            )}
+
+            {contentSuggestions && contentSuggestions.length > 0 && (
+              <Card className="mt-4 bg-card/70 border-input">
+                <CardHeader className="pb-2 pt-4">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Lightbulb className="h-5 w-5 text-primary" />
+                    Content Suggestions
+                  </CardTitle>
+                  <CardDescription className="text-xs">Consider these ideas to enhance your text. You can copy-paste or retype them into the text area above.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-auto max-h-[200px] ">
+                    <ul className="space-y-2 text-sm">
+                      {contentSuggestions.map((suggestion, index) => (
+                        <li key={index} className="p-2 border border-dashed border-border rounded-md bg-background/50 hover:bg-background/70">
+                          {suggestion}
+                        </li>
+                      ))}
+                    </ul>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            )}
+
 
           </CardContent>
         </Card>
@@ -346,34 +439,40 @@ export default function LinguaCheckPage() {
               Results & Corrections
             </CardTitle>
              <CardDescription className="text-sm">
-              {apiResponse ? (
-                "Review suggestions or view and edit the corrected text from your manual input."
+              {grammarApiResponse ? (
+                "Review grammar suggestions or view and edit the corrected text from your manual input."
               ) : (
-                "Results for manually typed text will appear here. Support for DOCX file analysis is coming soon!"
+                "Grammar check results for manually typed text will appear here. Support for DOCX file analysis is coming soon!"
               )}
             </CardDescription>
-            {/* "Check All Paragraphs" button is removed as DOCX UI is hidden */}
           </CardHeader>
           <CardContent className="flex-grow">
-            {isLoading && !apiResponse && ( // Simplified condition, no parsedParagraphs check
+            {(isLoadingGrammar && !grammarApiResponse) && (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4">
                 <Loader2 className="h-10 w-10 md:h-12 md:w-12 animate-spin text-primary mb-4" />
-                <p className="text-md md:text-lg">Analyzing your text...</p>
+                <p className="text-md md:text-lg">Analyzing your text for grammar...</p>
                 <p className="text-sm">This might take a few moments.</p>
               </div>
             )}
             
-            {/* Removed UI block for "AI Assistance Disabled" as toggle is hidden */}
 
-            {!isLoading && !apiResponse && !isFileProcessing && ( // Simplified condition
+            {!isLoadingGrammar && !grammarApiResponse && !isFileProcessing && !isSuggestingContent && (!contentSuggestions || contentSuggestions.length === 0) && (
                <div className="flex flex-col items-center justify-center h-full text-center p-4 rounded-lg border-2 border-dashed border-input">
                  <Image src="https://placehold.co/200x150.png" alt="Placeholder illustration" width={200} height={150} className="opacity-60 rounded mb-4" data-ai-hint="analysis document" />
                  <p className="text-muted-foreground text-md md:text-lg">Your content analysis will show up here.</p>
-                 <p className="text-xs md:text-sm text-muted-foreground">Enter text on the left to get started.</p>
+                 <p className="text-xs md:text-sm text-muted-foreground">Enter text and use the buttons on the left to get started.</p>
                </div>
             )}
+             {!isLoadingGrammar && !grammarApiResponse && !isFileProcessing && !isSuggestingContent && contentSuggestions && contentSuggestions.length > 0 && (
+                 <div className="flex flex-col items-center justify-center h-full text-center p-4 rounded-lg border-2 border-dashed border-input">
+                    <Image src="https://placehold.co/200x150.png" alt="Placeholder illustration" width={200} height={150} className="opacity-60 rounded mb-4" data-ai-hint="editing document" />
+                    <p className="text-muted-foreground text-md md:text-lg">Review the content suggestions on the left.</p>
+                    <p className="text-xs md:text-sm text-muted-foreground">After refining your text, click "Check Typed Text (Grammar)" to proceed.</p>
+                 </div>
+            )}
 
-            {apiResponse && ( // Simplified condition, no parsedParagraphs check
+
+            {grammarApiResponse && (
               <Tabs defaultValue="interactive" className="w-full h-full flex flex-col">
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="interactive">Interactive Corrections</TabsTrigger>
@@ -382,7 +481,7 @@ export default function LinguaCheckPage() {
                 <TabsContent value="interactive" className="flex-grow mt-4 overflow-y-auto">
                   <InteractiveCorrector
                     text={userModifiedText}
-                    aiSuggestions={apiResponse.suggestions || []}
+                    aiSuggestions={grammarApiResponse.suggestions || []}
                     onTextChange={setUserModifiedText}
                     className="min-h-[200px] sm:min-h-[250px] md:min-h-[300px]"
                   />
@@ -397,8 +496,6 @@ export default function LinguaCheckPage() {
                 </TabsContent>
               </Tabs>
             )}
-
-            {/* All UI related to parsedParagraphs (Accordion) is removed as DOCX upload is hidden */}
 
           </CardContent>
         </Card>
