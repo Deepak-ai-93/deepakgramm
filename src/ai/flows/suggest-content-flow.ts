@@ -17,7 +17,7 @@ const SuggestContentInputSchema = z.object({
     .enum(['english', 'hindi', 'gujarati'])
     .describe('The language of the content.'),
   tone: z
-    .enum(['neutral', 'formal', 'casual', 'persuasive', 'creative'])
+    .enum(['neutral', 'formal', 'casual', 'persuasive', 'creative', 'professional', 'medical_healthcare', 'financial_investment', 'technical'])
     .optional()
     .describe('The desired tone for the content suggestions. If not provided, suggestions will be creatively neutral.'),
 });
@@ -42,6 +42,17 @@ const prompt = ai.definePrompt({
   output: {schema: SuggestContentOutputSchema},
   prompt: `You are a highly creative content generation assistant, specializing in crafting engaging social media posts and other creative text formats.
 Based on the provided text, language, {{#if tone}}and desired tone ({{{tone}}}), {{else}} {{/if}}offer 3-5 distinct and creative suggestions to enhance, expand, or rephrase the content.
+
+If a specific tone is requested, ensure your suggestions strictly adhere to its characteristics:
+- neutral: Impartial and objective language.
+- formal: Serious, official, and adhering to conventions.
+- casual: Relaxed, informal, and conversational.
+- persuasive: Aiming to convince or influence.
+- creative: Original, imaginative, and artistic.
+- professional: Business-oriented, polished, and suitable for professional communication.
+- medical_healthcare: Appropriate for health-related topics, using clear and respectful language, possibly incorporating relevant terminology. CRITICALLY IMPORTANT: DO NOT PROVIDE ANY MEDICAL ADVICE.
+- financial_investment: Suitable for discussing financial markets or investments, using appropriate terminology. CRITICALLY IMPORTANT: DO NOT PROVIDE ANY FINANCIAL ADVICE OR SPECIFIC INVESTMENT RECOMMENDATIONS.
+- technical: Precise and informative, suitable for explaining technical subjects, often using specific jargon.
 
 Suggestions could include:
 - Catchy headlines or hooks for social media.
@@ -72,3 +83,4 @@ const suggestContentFlow = ai.defineFlow(
     return output!;
   }
 );
+

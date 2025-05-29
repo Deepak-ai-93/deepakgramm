@@ -20,7 +20,8 @@ import mammoth from 'mammoth';
 import { Type, UploadCloud, CheckCircle2, AlertCircle, BrainCircuit, Loader2, Lightbulb, Languages, FileCheck2, FileText, Wand2 } from "lucide-react";
 
 type Language = 'english' | 'hindi' | 'gujarati';
-type Tone = 'neutral' | 'formal' | 'casual' | 'persuasive' | 'creative';
+type Tone = 'neutral' | 'formal' | 'casual' | 'persuasive' | 'creative' | 'professional' | 'medical_healthcare' | 'financial_investment' | 'technical';
+
 
 interface ParagraphCheckState {
   id: string;
@@ -47,7 +48,7 @@ export default function LinguaCheckPage() {
   const [parsedParagraphs, setParsedParagraphs] = useState<ParagraphCheckState[]>([]);
   const [isCheckingAll, setIsCheckingAll] = useState<boolean>(false);
 
-  const [isAiAssistanceEnabled, setIsAiAssistanceEnabled] = useState<boolean>(false); // Default to OFF
+  const [isAiAssistanceEnabled, setIsAiAssistanceEnabled] = useState<boolean>(false); 
 
   const baseTitle = "Deepak Checker AI: AI-Powered Content Checker";
 
@@ -114,7 +115,7 @@ export default function LinguaCheckPage() {
     }
   };
 
-  const handleFetchSuggestions = async () => {
+  const fetchSuggestions = async () => {
     if (!isAiAssistanceEnabled || !inputText.trim()) {
       toast({
         title: !isAiAssistanceEnabled ? "AI Disabled" : "No Content",
@@ -124,8 +125,13 @@ export default function LinguaCheckPage() {
       setContentSuggestions([]);
       return;
     }
+    if (inputText.trim().split(/\s+/).length < 1) { // Min 1 word for manual button click
+        setContentSuggestions([]);
+        return;
+    }
+
     setIsLoadingSuggest(true);
-    setContentSuggestions([]); // Clear previous suggestions
+    setContentSuggestions([]); 
     try {
       const input: SuggestContentInput = {
         content: inputText,
@@ -145,6 +151,7 @@ export default function LinguaCheckPage() {
     }
   };
 
+
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     if (!isAiAssistanceEnabled) {
       toast({ title: "AI Disabled", description: "Cannot upload files when AI assistance is disabled.", variant: "destructive" });
@@ -155,13 +162,6 @@ export default function LinguaCheckPage() {
     if (event.target) event.target.value = ""; 
 
     if (file) {
-      // For now, only show "Coming Soon" message
-      toast({ title: "Feature Coming Soon", description: "DOCX file upload and processing is planned for a future update.", variant: "default" });
-      setUploadedFile(null);
-      return;
-
-      // Original DOCX processing logic (commented out)
-      /*
       if (file.type !== "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
         toast({ title: "Invalid File Type", description: "Please upload a .docx file.", variant: "destructive" });
         return;
@@ -196,7 +196,6 @@ export default function LinguaCheckPage() {
       } finally {
         setIsUploading(false);
       }
-      */
     }
   };
 
@@ -236,8 +235,13 @@ export default function LinguaCheckPage() {
   const currentWorkingText = userModifiedText ?? inputText;
   const canCheckOrSuggest = isAiAssistanceEnabled && !isLoadingCheck && !isLoadingSuggest && !isCheckingAll && !isUploading;
 
-  const renderManualSuggestions = () => {
+  const renderSuggestions = () => {
     if (!isAiAssistanceEnabled && contentSuggestions.length === 0) return null;
+
+    const suggestionMessage = () => {
+      if (selectedTone) return `Creative suggestions (tone: "${selectedTone}") - click to apply:`;
+      return "Creative suggestions - click to apply:";
+    };
 
     if (isLoadingSuggest) {
       return (
@@ -252,14 +256,14 @@ export default function LinguaCheckPage() {
       return (
         <div className="mt-3 mb-3 p-3 border rounded-md bg-card/50 min-h-[100px] flex flex-col shadow">
           <p className="text-sm text-muted-foreground mb-2 px-1">
-            {selectedTone ? `Creative suggestions (tone: "${selectedTone}") - click to apply:` : "Creative suggestions - click to apply:"}
+            {suggestionMessage()}
           </p>
           <ul className="space-y-1 text-sm">
             {contentSuggestions.map((suggestion, index) => (
               <TypingSuggestionItem
                 key={`${suggestion}-${index}-${selectedLanguage}-${selectedTone || 'general'}`}
                 suggestion={suggestion}
-                initialDelay={index * 100} // Faster staggering for manual fetch
+                initialDelay={index * 100} 
                 typingSpeed={20}
                 onClick={handleApplySuggestionToInput}
               />
@@ -269,7 +273,6 @@ export default function LinguaCheckPage() {
       );
     }
     
-    // Message when suggestions are not yet fetched or are empty after fetching.
     if (!isLoadingSuggest && contentSuggestions.length === 0 && isAiAssistanceEnabled) {
          return (
             <div className="mt-3 mb-3 p-3 border rounded-md bg-card/50 min-h-[100px] flex flex-col justify-center items-center shadow">
@@ -279,7 +282,6 @@ export default function LinguaCheckPage() {
             </div>
          );
     }
-
     return null;
   };
 
@@ -365,6 +367,10 @@ export default function LinguaCheckPage() {
                     <SelectItem value="casual">Casual</SelectItem>
                     <SelectItem value="persuasive">Persuasive</SelectItem>
                     <SelectItem value="creative">Creative</SelectItem>
+                    <SelectItem value="professional">Professional</SelectItem>
+                    <SelectItem value="medical_healthcare">Medical / Healthcare</SelectItem>
+                    <SelectItem value="financial_investment">Financial / Investment</SelectItem>
+                    <SelectItem value="technical">Technical</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -372,14 +378,14 @@ export default function LinguaCheckPage() {
               <div className="grid gap-1.5">
                  <Label htmlFor="file-upload-input" className="flex items-center gap-1.5"><UploadCloud className="h-4 w-4"/> Upload DOCX File</Label>
                  <Input
-                    id="file-upload-input" // Corrected ID here
+                    id="file-upload-input" 
                     type="file"
                     accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     onChange={handleFileUpload} 
                     className="file:mr-2 file:rounded-md file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/20"
                     disabled={!isAiAssistanceEnabled || isUploading || isLoadingCheck || isLoadingSuggest || isCheckingAll}
                   />
-                 <p className="text-xs text-amber-600">Feature coming soon! Use manual text input for now.</p>
+                 {/* <p className="text-xs text-amber-600">Feature coming soon! Use manual text input for now.</p> */}
               </div>
             </CardContent>
           </Card>
@@ -398,7 +404,7 @@ export default function LinguaCheckPage() {
                   setInputText(e.target.value);
                   setCheckContentResult(null);
                   setUserModifiedText(null);
-                  setContentSuggestions([]); // Clear suggestions when text changes
+                  setContentSuggestions([]); 
                   if (uploadedFile) setUploadedFile(null); 
                   if (parsedParagraphs.length > 0) setParsedParagraphs([]); 
                 }}
@@ -407,11 +413,11 @@ export default function LinguaCheckPage() {
                 disabled={parsedParagraphs.length > 0 && !inputText} 
               />
               
-              {renderManualSuggestions()}
+              {renderSuggestions()}
 
               <div className="flex flex-col sm:flex-row gap-2">
                  <Button
-                  onClick={handleFetchSuggestions}
+                  onClick={fetchSuggestions}
                   disabled={!canCheckOrSuggest || !inputText.trim()}
                   className="flex-1"
                   variant="outline"
@@ -446,16 +452,16 @@ export default function LinguaCheckPage() {
                  </CardDescription>
               ) : (
                 <CardDescription>
-                  {uploadedFile && parsedParagraphs.length > 0 
-                    ? "Document paragraphs are listed below. Expand to preview. Click 'Check' or 'Check All' for AI analysis and editing. (DOCX upload is coming soon, please use manual input for now)" 
-                    : "Enter text manually and click 'Check Typed Text (Grammar)' to see results. For DOCX, please use manual input for now (upload feature coming soon)."}
+                  {parsedParagraphs.length > 0 
+                    ? "Document paragraphs are listed below. Expand to preview. Click 'Check' or 'Check All' for AI analysis and editing."
+                    : "Enter text manually and click 'Check Typed Text (Grammar)' to see results. Or upload a DOCX file."}
                 </CardDescription>
               )}
             </CardHeader>
             <CardContent className="flex-grow flex flex-col gap-4">
               {isAiAssistanceEnabled && (
                 <>
-                  {checkContentResult && !uploadedFile && parsedParagraphs.length === 0 && (
+                  {checkContentResult && parsedParagraphs.length === 0 && (
                     <Tabs defaultValue="interactive" className="w-full">
                       <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="interactive">Interactive Corrections</TabsTrigger>
@@ -472,7 +478,7 @@ export default function LinguaCheckPage() {
                       </TabsContent>
                       <TabsContent value="corrected">
                         <Textarea
-                          value={userModifiedText ?? ''}
+                          value={userModifiedText ?? checkContentResult.correctedContent ?? ''}
                           onChange={(e) => handleUserModifiedTextChange(e.target.value)}
                           className="min-h-[200px] text-base bg-card border-input focus:ring-primary"
                           rows={10}
@@ -492,7 +498,7 @@ export default function LinguaCheckPage() {
                           size="sm"
                           variant="outline"
                         >
-                          {isCheckingAll ? <Loader2 className="animate-spin"/> : <FileCheck2/>}
+                          {isCheckingAll ? <Loader2 className="animate-spin"/> : <FileCheck2 className="mr-1.5 h-4 w-4"/>}
                           Check All Paragraphs
                         </Button>
                       </div>
@@ -528,23 +534,26 @@ export default function LinguaCheckPage() {
                               )}
                             </AccordionTrigger>
                             <AccordionContent className="px-4 pb-4">
-                              {!para.result && !para.isLoading && !para.error && (
-                                <div className="p-3 border rounded-md bg-background my-2">
+                               <div className="p-3 border rounded-md bg-background my-2">
                                   <p className="text-sm font-medium text-muted-foreground mb-1">Preview: Original Paragraph Content</p>
                                   <p className="text-sm whitespace-pre-wrap">{para.originalText}</p>
-                                  <p className="text-xs text-muted-foreground mt-2">Click "Check" above to analyze this paragraph.</p>
+                                  {!para.result && !para.isLoading && !para.error && (
+                                    <p className="text-xs text-muted-foreground mt-2">Click "Check" above to analyze this paragraph.</p>
+                                  )}
                                 </div>
-                              )}
                               {para.isLoading && (
                                 <div className="flex items-center justify-center p-4 text-muted-foreground">
                                   <Loader2 className="h-5 w-5 animate-spin mr-2" /> Analyzing paragraph...
                                 </div>
                               )}
                               {para.error && (
-                                <AlertCircle className="text-destructive">
-                                  <p className="font-semibold">Error:</p>
-                                  <p>{para.error}</p>
-                                </AlertCircle>
+                                 <div className="p-2 border border-destructive/50 bg-destructive/10 rounded-md text-destructive">
+                                  <div className="flex items-center gap-2">
+                                    <AlertCircle className="h-5 w-5"/>
+                                    <p className="font-semibold">Error:</p>
+                                  </div>
+                                  <p className="text-sm mt-1">{para.error}</p>
+                                </div>
                               )}
                               {para.result && (
                                 <Tabs defaultValue="interactive" className="w-full mt-2">
