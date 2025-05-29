@@ -31,9 +31,6 @@ interface ParagraphCheckState {
   userModifiedText: string | null; // For editable corrected text
 }
 
-const MIN_WORDS_FOR_AUTO_SUGGEST = 5;
-const AUTO_SUGGEST_DEBOUNCE_TIME = 1500; // 1.5 seconds
-
 export default function LinguaCheckPage() {
   const [inputText, setInputText] = useState<string>("");
   const [selectedLanguage, setSelectedLanguage] = useState<Language>('english');
@@ -117,68 +114,36 @@ export default function LinguaCheckPage() {
     }
   };
 
-  const fetchSuggestions = useCallback(async (textToSuggest: string) => {
-    if (!isAiAssistanceEnabled || !textToSuggest.trim() || textToSuggest.split(/\s+/).filter(Boolean).length < MIN_WORDS_FOR_AUTO_SUGGEST) {
+  const handleFetchSuggestions = async () => {
+    if (!isAiAssistanceEnabled || !inputText.trim()) {
+      toast({
+        title: !isAiAssistanceEnabled ? "AI Disabled" : "No Content",
+        description: !isAiAssistanceEnabled ? "Enable AI assistance first." : "Please enter some text to get suggestions.",
+        variant: "destructive"
+      });
       setContentSuggestions([]);
-      if (isLoadingSuggest) setIsLoadingSuggest(false); 
       return;
     }
     setIsLoadingSuggest(true);
+    setContentSuggestions([]); // Clear previous suggestions
     try {
       const input: SuggestContentInput = {
-        content: textToSuggest,
+        content: inputText,
         language: selectedLanguage,
         tone: selectedTone
       };
       const result = await suggestContent(input);
       setContentSuggestions(result.suggestions);
+      toast({ title: "Suggestions Ready", description: "Creative suggestions have been generated." });
     } catch (error) {
       console.error("Error fetching suggestions:", error);
+      const errorMsg = error instanceof Error ? error.message : "An unknown error occurred.";
+      toast({ title: "Error Fetching Suggestions", description: errorMsg, variant: "destructive" });
       setContentSuggestions([]);
     } finally {
       setIsLoadingSuggest(false);
     }
-  }, [selectedLanguage, selectedTone, isAiAssistanceEnabled, isLoadingSuggest]);
-
-
-  const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-    const debouncedFunc = (...args: Parameters<F>): Promise<ReturnType<F>> =>
-      new Promise(resolve => {
-        if (timeout) {
-          clearTimeout(timeout);
-        }
-        timeout = setTimeout(() => resolve(func(...args)), waitFor);
-      });
-
-    (debouncedFunc as any).cancel = () => {
-        if (timeout) {
-            clearTimeout(timeout);
-            timeout = null;
-        }
-    };
-    return debouncedFunc as F & { cancel: () => void };
   };
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const debouncedFetchSuggestions = useMemo(() => debounce(fetchSuggestions, AUTO_SUGGEST_DEBOUNCE_TIME), [fetchSuggestions]);
-
-  useEffect(() => {
-    if (inputText.split(/\s+/).filter(Boolean).length >= MIN_WORDS_FOR_AUTO_SUGGEST && isAiAssistanceEnabled) {
-      debouncedFetchSuggestions(inputText);
-    } else {
-      debouncedFetchSuggestions.cancel();
-      setContentSuggestions([]);
-      if(isLoadingSuggest && inputText.split(/\s+/).filter(Boolean).length < MIN_WORDS_FOR_AUTO_SUGGEST) {
-        setIsLoadingSuggest(false); 
-      }
-    }
-    return () => {
-        debouncedFetchSuggestions.cancel();
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputText, isAiAssistanceEnabled, selectedLanguage, selectedTone]); 
-
 
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     if (!isAiAssistanceEnabled) {
@@ -190,6 +155,13 @@ export default function LinguaCheckPage() {
     if (event.target) event.target.value = ""; 
 
     if (file) {
+      // For now, only show "Coming Soon" message
+      toast({ title: "Feature Coming Soon", description: "DOCX file upload and processing is planned for a future update.", variant: "default" });
+      setUploadedFile(null);
+      return;
+
+      // Original DOCX processing logic (commented out)
+      /*
       if (file.type !== "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
         toast({ title: "Invalid File Type", description: "Please upload a .docx file.", variant: "destructive" });
         return;
@@ -224,6 +196,7 @@ export default function LinguaCheckPage() {
       } finally {
         setIsUploading(false);
       }
+      */
     }
   };
 
@@ -258,50 +231,56 @@ export default function LinguaCheckPage() {
     setCheckContentResult(null); 
     setUserModifiedText(null);   
     setContentSuggestions([]);   
-    debouncedFetchSuggestions.cancel(); 
   };
 
   const currentWorkingText = userModifiedText ?? inputText;
   const canCheckOrSuggest = isAiAssistanceEnabled && !isLoadingCheck && !isLoadingSuggest && !isCheckingAll && !isUploading;
-  const currentInputWordCount = inputText.split(/\s+/).filter(Boolean).length;
 
-  const renderAsYouTypeSuggestions = () => {
-    if (!isAiAssistanceEnabled) return null;
+  const renderManualSuggestions = () => {
+    if (!isAiAssistanceEnabled && contentSuggestions.length === 0) return null;
 
-    const suggestionsArea = (
-      <div className="mt-3 mb-3 p-3 border rounded-md bg-card/50 min-h-[100px] flex flex-col justify-center shadow">
-        {isLoadingSuggest && contentSuggestions.length === 0 ? (
-          <div className="flex items-center justify-center text-muted-foreground">
-            <Loader2 className="animate-spin h-5 w-5 mr-2" />
-            Fetching creative suggestions...
-          </div>
-        ) : contentSuggestions.length > 0 ? (
-          <>
-            <p className="text-sm text-muted-foreground mb-2 px-1">
-              {selectedTone ? `Creative suggestions (tone: "${selectedTone}") - click to apply:` : "Creative suggestions - click to apply:"}
-            </p>
-            <ul className="space-y-1 text-sm">
-              {contentSuggestions.map((suggestion, index) => (
-                <TypingSuggestionItem
-                  key={`${suggestion}-${index}-${selectedLanguage}-${selectedTone || 'general'}`}
-                  suggestion={suggestion}
-                  initialDelay={index * 150}
-                  typingSpeed={25}
-                  onClick={handleApplySuggestionToInput}
-                />
-              ))}
-            </ul>
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground text-center px-1">
-            {currentInputWordCount < MIN_WORDS_FOR_AUTO_SUGGEST
-              ? `Type at least ${MIN_WORDS_FOR_AUTO_SUGGEST} words for automatic, tone-aware creative suggestions for your text.`
-              : "No specific creative suggestions at this moment. Keep typing, adjust your text, or try changing the tone."}
+    if (isLoadingSuggest) {
+      return (
+        <div className="mt-3 mb-3 p-3 border rounded-md bg-card/50 min-h-[100px] flex flex-col justify-center items-center shadow">
+          <Loader2 className="animate-spin h-5 w-5 mr-2 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Fetching creative suggestions...</p>
+        </div>
+      );
+    }
+
+    if (contentSuggestions.length > 0) {
+      return (
+        <div className="mt-3 mb-3 p-3 border rounded-md bg-card/50 min-h-[100px] flex flex-col shadow">
+          <p className="text-sm text-muted-foreground mb-2 px-1">
+            {selectedTone ? `Creative suggestions (tone: "${selectedTone}") - click to apply:` : "Creative suggestions - click to apply:"}
           </p>
-        )}
-      </div>
-    );
-    return suggestionsArea;
+          <ul className="space-y-1 text-sm">
+            {contentSuggestions.map((suggestion, index) => (
+              <TypingSuggestionItem
+                key={`${suggestion}-${index}-${selectedLanguage}-${selectedTone || 'general'}`}
+                suggestion={suggestion}
+                initialDelay={index * 100} // Faster staggering for manual fetch
+                typingSpeed={20}
+                onClick={handleApplySuggestionToInput}
+              />
+            ))}
+          </ul>
+        </div>
+      );
+    }
+    
+    // Message when suggestions are not yet fetched or are empty after fetching.
+    if (!isLoadingSuggest && contentSuggestions.length === 0 && isAiAssistanceEnabled) {
+         return (
+            <div className="mt-3 mb-3 p-3 border rounded-md bg-card/50 min-h-[100px] flex flex-col justify-center items-center shadow">
+                 <p className="text-sm text-muted-foreground text-center px-1">
+                    Click "Get Creative Suggestions" to generate ideas for your text.
+                </p>
+            </div>
+         );
+    }
+
+    return null;
   };
 
 
@@ -338,16 +317,10 @@ export default function LinguaCheckPage() {
                     setIsAiAssistanceEnabled(checked);
                     if (!checked) {
                       setContentSuggestions([]);
-                      debouncedFetchSuggestions.cancel();
-                      if (isLoadingSuggest) setIsLoadingSuggest(false);
                       setParsedParagraphs([]); 
                       setUploadedFile(null);
                       setCheckContentResult(null);
                       setUserModifiedText(null);
-                    } else {
-                      if (inputText.split(/\s+/).filter(Boolean).length >= MIN_WORDS_FOR_AUTO_SUGGEST) {
-                        debouncedFetchSuggestions(inputText);
-                      }
                     }
                   }}
                   disabled={isLoadingCheck || isLoadingSuggest || isCheckingAll || isUploading}
@@ -397,16 +370,16 @@ export default function LinguaCheckPage() {
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="file-upload-input" className="flex items-center gap-1.5"><UploadCloud className="h-4 w-4"/> Upload DOCX File</Label>
+                 <Label htmlFor="file-upload-input" className="flex items-center gap-1.5"><UploadCloud className="h-4 w-4"/> Upload DOCX File</Label>
                  <Input
-                    id="file-upload-input"
+                    id="file-upload-input" // Corrected ID here
                     type="file"
                     accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     onChange={handleFileUpload} 
                     className="file:mr-2 file:rounded-md file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/20"
                     disabled={!isAiAssistanceEnabled || isUploading || isLoadingCheck || isLoadingSuggest || isCheckingAll}
                   />
-                {/* <p className="text-xs text-amber-600">Feature coming soon! Use manual text input for now.</p> */}
+                 <p className="text-xs text-amber-600">Feature coming soon! Use manual text input for now.</p>
               </div>
             </CardContent>
           </Card>
@@ -414,7 +387,7 @@ export default function LinguaCheckPage() {
           <Card className="shadow-xl border-border">
             <CardHeader>
               <CardTitle className="text-xl md:text-2xl">Enter Text Manually</CardTitle>
-              <CardDescription>Type or paste content. Tone-aware creative suggestions for your full text (e.g., for social media) appear automatically below as you type (min {MIN_WORDS_FOR_AUTO_SUGGEST} words).</CardDescription>
+              <CardDescription>Type or paste content. Click "Get Creative Suggestions" for tone-aware ideas. Then, check grammar and spelling.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               <Textarea
@@ -425,6 +398,7 @@ export default function LinguaCheckPage() {
                   setInputText(e.target.value);
                   setCheckContentResult(null);
                   setUserModifiedText(null);
+                  setContentSuggestions([]); // Clear suggestions when text changes
                   if (uploadedFile) setUploadedFile(null); 
                   if (parsedParagraphs.length > 0) setParsedParagraphs([]); 
                 }}
@@ -433,9 +407,18 @@ export default function LinguaCheckPage() {
                 disabled={parsedParagraphs.length > 0 && !inputText} 
               />
               
-              {renderAsYouTypeSuggestions()}
+              {renderManualSuggestions()}
 
               <div className="flex flex-col sm:flex-row gap-2">
+                 <Button
+                  onClick={handleFetchSuggestions}
+                  disabled={!canCheckOrSuggest || !inputText.trim()}
+                  className="flex-1"
+                  variant="outline"
+                >
+                  {isLoadingSuggest ? <Loader2 className="animate-spin" /> : <Lightbulb />}
+                  Get Creative Suggestions
+                </Button>
                 <Button
                   onClick={() => handleCheckContent(inputText)}
                   disabled={!canCheckOrSuggest || !inputText.trim()}
@@ -464,8 +447,8 @@ export default function LinguaCheckPage() {
               ) : (
                 <CardDescription>
                   {uploadedFile && parsedParagraphs.length > 0 
-                    ? "Document paragraphs are listed below. Expand to preview. Click 'Check' or 'Check All' for AI analysis and editing." 
-                    : "Enter text manually and click 'Check Typed Text (Grammar)' to see results, or upload a DOCX file."}
+                    ? "Document paragraphs are listed below. Expand to preview. Click 'Check' or 'Check All' for AI analysis and editing. (DOCX upload is coming soon, please use manual input for now)" 
+                    : "Enter text manually and click 'Check Typed Text (Grammar)' to see results. For DOCX, please use manual input for now (upload feature coming soon)."}
                 </CardDescription>
               )}
             </CardHeader>
