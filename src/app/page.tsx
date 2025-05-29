@@ -65,7 +65,7 @@ export default function LinguaCheckPage() {
 
     setIsLoading(true);
     setApiResponse(null);
-    setParsedParagraphs([]); 
+    setParsedParagraphs([]);
     setUploadedFileName(null);
     setUserModifiedText(inputText);
 
@@ -110,19 +110,19 @@ export default function LinguaCheckPage() {
 
     setIsFileProcessing(true);
     setUploadedFileName(file.name);
-    setInputText(""); 
-    setApiResponse(null); 
+    setInputText("");
+    setApiResponse(null);
     setParsedParagraphs([]);
 
     try {
       const arrayBuffer = await file.arrayBuffer();
       const result = await mammoth.convertToHtml({ arrayBuffer });
       const html = result.value;
-      
+
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = html;
       const pElements = tempDiv.getElementsByTagName('p');
-      
+
       const paragraphs: ParagraphItem[] = Array.from(pElements)
         .map((p, index) => ({
           id: `para_${index}_${Date.now()}`,
@@ -156,7 +156,7 @@ export default function LinguaCheckPage() {
       setUploadedFileName(null);
     } finally {
       setIsFileProcessing(false);
-      event.target.value = ""; 
+      event.target.value = "";
     }
   };
 
@@ -231,7 +231,7 @@ export default function LinguaCheckPage() {
         description: "All paragraphs have been processed.",
     });
   };
-  
+
   const handleParagraphTextChange = (paragraphId: string, newText: string) => {
     setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, userModifiedText: newText } : p));
   };
@@ -274,7 +274,7 @@ export default function LinguaCheckPage() {
                   </SelectContent>
                 </Select>
               </div>
-            
+
             <div className="border p-4 rounded-md bg-card/50">
               <label htmlFor="manual-text-input" className="block text-sm font-medium text-muted-foreground mb-1">Enter Text Manually:</label>
               <Textarea
@@ -297,7 +297,7 @@ export default function LinguaCheckPage() {
                 )}
               </Button>
             </div>
-            
+
             <div className="border p-4 rounded-md bg-card/50">
               <label htmlFor="file-upload-input" className="block text-sm font-medium text-muted-foreground mb-1">Or Upload DOCX File:</label>
               <div className="flex items-center gap-3">
@@ -368,7 +368,7 @@ export default function LinguaCheckPage() {
                  <p className="text-xs md:text-sm text-muted-foreground">Enter text or upload a DOCX file on the left.</p>
                </div>
             )}
-            
+
             {apiResponse && parsedParagraphs.length === 0 && (
               <Tabs defaultValue="interactive" className="w-full h-full flex flex-col">
                 <TabsList className="grid w-full grid-cols-2">
@@ -412,15 +412,16 @@ export default function LinguaCheckPage() {
                               <FileCheck2 className="h-5 w-5 text-green-500" />
                             ) : (
                               <Button
+                                asChild
                                 size="sm"
                                 variant="outline"
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  handleCheckParagraph(para.id); 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCheckParagraph(para.id);
                                 }}
                                 disabled={isFileProcessing || isCheckingAll}
                               >
-                                Check
+                                <span>Check</span>
                               </Button>
                             )}
                           </div>
@@ -479,3 +480,4 @@ export default function LinguaCheckPage() {
     </div>
   );
 }
+
