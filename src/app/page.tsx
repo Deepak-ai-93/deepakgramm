@@ -72,7 +72,7 @@ export default function LinguaCheckPage() {
   };
 
   const handleToneChange = (value: string) => {
-    setSelectedTone(value as Tone);
+    setSelectedTone(value === "none" ? undefined : value as Tone);
     // Content suggestions will be re-fetched by useEffect if inputText is present
   };
 
@@ -117,8 +117,9 @@ export default function LinguaCheckPage() {
   };
 
   const fetchSuggestions = useCallback(async (textToSuggest: string, showToast: boolean = false, applyTone: boolean = true) => {
-    if (!isAiAssistanceEnabled || !textToSuggest.trim() || textToSuggest.split(/\s+/).length < MIN_WORDS_FOR_AUTO_SUGGEST) {
+    if (!isAiAssistanceEnabled || !textToSuggest.trim() || textToSuggest.split(/\s+/).filter(Boolean).length < MIN_WORDS_FOR_AUTO_SUGGEST) {
       setContentSuggestions([]);
+      if (isLoadingSuggest && !showToast) setIsLoadingSuggest(false); // Clear loading if auto-suggest conditions not met
       return;
     }
     setIsLoadingSuggest(true);
@@ -142,7 +143,7 @@ export default function LinguaCheckPage() {
     } finally {
       setIsLoadingSuggest(false);
     }
-  }, [selectedLanguage, selectedTone, toast, isAiAssistanceEnabled]);
+  }, [selectedLanguage, selectedTone, toast, isAiAssistanceEnabled, isLoadingSuggest]);
 
   const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
     let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -163,8 +164,10 @@ export default function LinguaCheckPage() {
       debouncedFetchSuggestions(inputText, false, true); 
     } else {
       setContentSuggestions([]);
+      if(isLoadingSuggest) setIsLoadingSuggest(false); // Clear loading if conditions no longer met
     }
-  }, [inputText, debouncedFetchSuggestions, isAiAssistanceEnabled, selectedLanguage, selectedTone]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputText, isAiAssistanceEnabled, selectedLanguage, selectedTone]); // debouncedFetchSuggestions removed as it's stable
 
 
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -181,6 +184,7 @@ export default function LinguaCheckPage() {
         setCheckContentResult(null); 
         setUserModifiedText(null);
         setContentSuggestions([]);
+        setInputText(""); // Clear manual input when a file is uploaded
         toast({ title: "File Uploaded", description: `Processing ${file.name}...` });
         try {
           const arrayBuffer = await file.arrayBuffer();
@@ -238,6 +242,7 @@ export default function LinguaCheckPage() {
 
   const currentWorkingText = userModifiedText ?? inputText;
   const canCheckOrSuggest = isAiAssistanceEnabled && !isLoadingCheck && !isLoadingSuggest && !isCheckingAll && !isUploading;
+  const currentInputWordCount = inputText.split(/\s+/).filter(Boolean).length;
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background text-foreground font-sans">
@@ -268,7 +273,12 @@ export default function LinguaCheckPage() {
                 <Switch
                   id="ai-assistance-toggle"
                   checked={isAiAssistanceEnabled}
-                  onCheckedChange={setIsAiAssistanceEnabled}
+                  onCheckedChange={(checked) => {
+                    setIsAiAssistanceEnabled(checked);
+                    if (!checked) {
+                      setContentSuggestions([]); // Clear suggestions if AI is disabled
+                    }
+                  }}
                   disabled={isLoadingCheck || isLoadingSuggest || isCheckingAll || isUploading}
                 />
                 <Label htmlFor="ai-assistance-toggle" className="flex items-center gap-1.5">
@@ -297,14 +307,15 @@ export default function LinguaCheckPage() {
               <div className="grid gap-1.5">
                 <Label htmlFor="tone-select" className="flex items-center gap-1.5"><Wand2 className="h-4 w-4"/> Tone (for As-You-Type Suggestions)</Label>
                 <Select
-                  value={selectedTone}
+                  value={selectedTone || "none"}
                   onValueChange={handleToneChange}
                   disabled={!isAiAssistanceEnabled || isLoadingSuggest}
                 >
-                  <SelectTrigger id="tone-select" className="w-full md:w-[220px]"> {/* Wider for clarity */}
+                  <SelectTrigger id="tone-select" className="w-full md:w-[220px]">
                     <SelectValue placeholder="Select tone (optional)" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">None (General)</SelectItem>
                     <SelectItem value="neutral">Neutral</SelectItem>
                     <SelectItem value="formal">Formal</SelectItem>
                     <SelectItem value="casual">Casual</SelectItem>
@@ -331,7 +342,7 @@ export default function LinguaCheckPage() {
           <Card className="shadow-xl border-border">
             <CardHeader>
               <CardTitle className="text-xl md:text-2xl">Enter Text Manually</CardTitle>
-              <CardDescription>Type or paste your content below. Tone-aware suggestions will appear as you type.</CardDescription>
+              <CardDescription>Type or paste content. Tone-aware suggestions appear as you type (min {MIN_WORDS_FOR_AUTO_SUGGEST} words).</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               <Textarea
@@ -342,19 +353,21 @@ export default function LinguaCheckPage() {
                   setInputText(e.target.value);
                   setCheckContentResult(null); 
                   setUserModifiedText(null);
+                  if (uploadedFile) setUploadedFile(null); // Clear file if user starts typing manually
+                  if (parsedParagraphs.length > 0) setParsedParagraphs([]);
                 }}
                 className="flex-grow min-h-[200px] sm:min-h-[250px] text-base bg-card border-input focus:ring-primary"
                 rows={10}
-                disabled={!isAiAssistanceEnabled && parsedParagraphs.length > 0} 
+                disabled={!isAiAssistanceEnabled && parsedParagraphs.length > 0 && !inputText} 
               />
               <div className="flex flex-col sm:flex-row gap-2">
                 <Button
-                  onClick={() => fetchSuggestions(inputText, true, false)} // applyTone is false for button
+                  onClick={() => fetchSuggestions(inputText, true, false)} 
                   disabled={!canCheckOrSuggest || !inputText.trim()}
                   className="flex-1"
                   variant="outline"
                 >
-                  {isLoadingSuggest ? <Loader2 className="animate-spin" /> : <Lightbulb />}
+                  {isLoadingSuggest && !contentSuggestions.length ? <Loader2 className="animate-spin" /> : <Lightbulb />}
                   Get General Suggestions
                 </Button>
                 <Button
@@ -369,17 +382,41 @@ export default function LinguaCheckPage() {
             </CardContent>
           </Card>
           
-          {isAiAssistanceEnabled && contentSuggestions.length > 0 && (
+          {isAiAssistanceEnabled && (
             <Card className="shadow-lg border-border">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2"><Lightbulb className="text-primary"/> Content Suggestions</CardTitle>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Lightbulb className="text-primary h-5 w-5"/> Content Suggestions
+                </CardTitle>
+                <CardDescription>
+                  {isLoadingSuggest && !contentSuggestions.length 
+                    ? "Looking for ways to improve your text..."
+                    : contentSuggestions.length > 0
+                    ? (selectedTone ? `Here are some suggestions in a "${selectedTone}" tone:` : "Here are some suggestions:")
+                    : (currentInputWordCount < MIN_WORDS_FOR_AUTO_SUGGEST
+                       ? `Suggestions will appear here as you type (min ${MIN_WORDS_FOR_AUTO_SUGGEST} words${selectedTone ? ` in a "${selectedTone}" tone` : ''}).`
+                       : `No specific suggestions at this moment. Try typing more, adjusting your text, or changing the tone.`)}
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <ul className="list-disc pl-5 space-y-2 text-sm">
-                  {contentSuggestions.map((suggestion, index) => (
-                    <li key={index}>{suggestion}</li>
-                  ))}
-                </ul>
+              <CardContent className="min-h-[100px] flex flex-col justify-center">
+                {isLoadingSuggest && contentSuggestions.length === 0 ? (
+                  <div className="flex items-center justify-center text-muted-foreground">
+                    <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                    Fetching suggestions...
+                  </div>
+                ) : contentSuggestions.length > 0 ? (
+                  <ul className="list-disc pl-5 space-y-2 text-sm">
+                    {contentSuggestions.map((suggestion, index) => (
+                      <li key={index}>{suggestion}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center">
+                    {currentInputWordCount < MIN_WORDS_FOR_AUTO_SUGGEST
+                      ? `Type at least ${MIN_WORDS_FOR_AUTO_SUGGEST} words for automatic suggestions.`
+                      : "No suggestions available right now. Keep typing or try the 'Get General Suggestions' button."}
+                  </p>
+                )}
               </CardContent>
             </Card>
           )}
@@ -410,7 +447,7 @@ export default function LinguaCheckPage() {
               {isAiAssistanceEnabled && (
                 <>
                   {/* Results for Manual Input */}
-                  {checkContentResult && !uploadedFile && (
+                  {checkContentResult && !uploadedFile && ( // Only show if no file is active
                     <Tabs defaultValue="interactive" className="w-full">
                       <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="interactive">Interactive Corrections</TabsTrigger>
@@ -442,12 +479,12 @@ export default function LinguaCheckPage() {
                     <div className="flex flex-col gap-4">
                       <Button
                         onClick={handleCheckAllParagraphs}
-                        disabled={!canCheckOrSuggest || parsedParagraphs.every(p => p.result || p.error)}
+                        disabled={!canCheckOrSuggest || parsedParagraphs.every(p => p.result || p.error || p.isLoading)}
                         variant="outline"
                         className="w-full"
                       >
                         {isCheckingAll ? <Loader2 className="animate-spin" /> : <FileCheck2 />}
-                        Check All Paragraphs
+                        Check All Unchecked Paragraphs
                       </Button>
                       <Accordion type="multiple" className="w-full space-y-2">
                         {parsedParagraphs.map((para, index) => (
@@ -466,7 +503,7 @@ export default function LinguaCheckPage() {
                                         variant="outline"
                                         onClick={(e) => {
                                         e.stopPropagation(); 
-                                        if (!isCheckingAll) handleCheckContent(para.originalText, true, para.id);
+                                        if (!isCheckingAll && !para.isLoading) handleCheckContent(para.originalText, true, para.id);
                                         }}
                                         disabled={isCheckingAll || para.isLoading}
                                         className="ml-auto flex-shrink-0"
@@ -499,7 +536,7 @@ export default function LinguaCheckPage() {
                                   </TabsList>
                                   <TabsContent value="interactive-para">
                                     <InteractiveCorrector
-                                      text={para.userModifiedText ?? para.originalText}
+                                      text={para.userModifiedText ?? para.originalText} // Use original if no user modification
                                       aiSuggestions={para.result.suggestions || []}
                                       onTextChange={(newText) => handleParagraphUserModifiedTextChange(para.id, newText)}
                                       className="min-h-[100px]"
@@ -507,7 +544,7 @@ export default function LinguaCheckPage() {
                                   </TabsContent>
                                   <TabsContent value="corrected-para">
                                     <Textarea
-                                      value={para.userModifiedText ?? ''}
+                                      value={para.userModifiedText ?? para.result.correctedContent} // Fallback to AI corrected
                                       onChange={(e) => handleParagraphUserModifiedTextChange(para.id, e.target.value)}
                                       className="min-h-[100px] text-sm bg-card border-input focus:ring-primary"
                                       rows={5}
@@ -540,3 +577,5 @@ export default function LinguaCheckPage() {
     </div>
   );
 }
+
+    
