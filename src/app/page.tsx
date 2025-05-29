@@ -65,7 +65,7 @@ export default function LinguaCheckPage() {
     setSelectedLanguage(value as Language);
     setCheckContentResult(null);
     setUserModifiedText(null);
-    // No need to clear contentSuggestions here, as it will be re-fetched by useEffect if inputText and tone change.
+    // Content suggestions will be re-fetched by useEffect if inputText and tone change.
     if (parsedParagraphs.length > 0) {
       setParsedParagraphs(prev => prev.map(p => ({ ...p, result: null, error: null, userModifiedText: null, isLoading: false })));
     }
@@ -354,8 +354,7 @@ export default function LinguaCheckPage() {
                   className="flex-1"
                   variant="outline"
                 >
-                  {isLoadingSuggest && <Loader2 className="animate-spin" />} 
-                                    {!isLoadingSuggest && <Lightbulb />}
+                  {isLoadingSuggest ? <Loader2 className="animate-spin" /> : <Lightbulb />}
                   Get General Suggestions
                 </Button>
                 <Button
@@ -541,4 +540,3 @@ export default function LinguaCheckPage() {
     </div>
   );
 }
-
