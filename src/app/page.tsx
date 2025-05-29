@@ -81,7 +81,7 @@ export default function LinguaCheckPage() {
         <div className="inline-flex items-center justify-center gap-2 md:gap-3">
            <BookText className="h-10 w-10 md:h-12 md:w-12 text-primary" />
           <h1 className="text-3xl md:text-5xl font-bold text-primary-foreground bg-primary px-3 py-1 md:px-4 md:py-2 rounded-lg shadow-md">
-            LinguaCheck
+            Deepak Checker AI
           </h1>
         </div>
         <p className="mt-2 md:mt-3 text-md md:text-lg text-muted-foreground">
@@ -185,7 +185,7 @@ export default function LinguaCheckPage() {
         </Card>
       </div>
       <footer className="text-center mt-8 md:mt-12 py-4 text-xs md:text-sm text-muted-foreground">
-        LinguaCheck &copy; {new Date().getFullYear()} | Powered by Generative AI
+        Deepak Checker AI &copy; {new Date().getFullYear()} | Powered by Generative AI
       </footer>
     </div>
   );

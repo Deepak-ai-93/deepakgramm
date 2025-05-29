@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'LinguaCheck: AI-Powered Content Checker',
+  title: 'Deepak Checker AI: AI-Powered Content Checker',
   description: 'Check content for spelling and grammatical errors in English, Hindi, and Gujarati with AI-powered suggestions.',
 };
 
