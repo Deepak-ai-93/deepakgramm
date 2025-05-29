@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { InteractiveCorrector } from "@/components/linguacheck/InteractiveCorrector";
-import { TypingSuggestionItem } from "@/components/linguacheck/TypingSuggestionItem"; // Import new component
+import { TypingSuggestionItem } from "@/components/linguacheck/TypingSuggestionItem";
 import { checkContentErrors, type CheckContentErrorsInput, type CheckContentErrorsOutput } from "@/ai/flows/check-content-errors";
 import { suggestContent, type SuggestContentInput, type SuggestContentOutput } from "@/ai/flows/suggest-content-flow";
 import mammoth from 'mammoth';
@@ -348,15 +348,14 @@ export default function LinguaCheckPage() {
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="file-upload" className="flex items-center gap-1.5"><UploadCloud className="h-4 w-4"/> Upload DOCX File</Label>
-                <Input
-                  id="file-upload"
-                  type="file"
-                  accept=".docx"
-                  onChange={handleFileUpload}
-                  disabled={!isAiAssistanceEnabled || isLoadingCheck || isLoadingSuggest || isCheckingAll || isUploading}
-                  className="file:mr-2 file:rounded-md file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/20"
-                />
+                <Label htmlFor="file-upload-coming-soon" className="flex items-center gap-1.5"><UploadCloud className="h-4 w-4"/> Upload DOCX File</Label>
+                <div
+                  id="file-upload-coming-soon"
+                  className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground"
+                  aria-live="polite"
+                >
+                  Feature coming soon!
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -460,14 +459,8 @@ export default function LinguaCheckPage() {
                  <CardDescription className="text-sm text-amber-500 flex items-center gap-1.5">
                     <AlertCircle className="h-4 w-4" /> AI assistance is currently disabled. Enable it from 'Input Options' to analyze content.
                  </CardDescription>
-              ) : uploadedFile && parsedParagraphs.length === 0 && !isUploading ? (
-                <CardDescription>No paragraphs found in the uploaded file or file is empty.</CardDescription>
-              ) : uploadedFile && isUploading ? (
-                <CardDescription className="flex items-center gap-2"><Loader2 className="animate-spin h-4 w-4"/>Processing uploaded file...</CardDescription>
-              ) : parsedParagraphs.length > 0 ? (
-                 <CardDescription>Document paragraphs are listed below. Expand to preview. Click 'Check' or 'Check All' for AI analysis and editing.</CardDescription>
-              ) : (
-                <CardDescription>Enter text or upload a DOCX file and click 'Check' to see results.</CardDescription>
+              ) : ( // No specific condition for uploadedFile coming soon, as it won't populate parsedParagraphs
+                <CardDescription>Enter text in the manual input area and click 'Check Typed Text (Grammar)' to see results. DOCX upload is coming soon.</CardDescription>
               )}
             </CardHeader>
             <CardContent className="flex-grow flex flex-col gap-4">
@@ -501,7 +494,7 @@ export default function LinguaCheckPage() {
                     </Tabs>
                   )}
 
-                  {/* Results for DOCX Upload */}
+                  {/* Results for DOCX Upload - This section will not render if file upload is "coming soon" */}
                   {parsedParagraphs.length > 0 && (
                     <div className="flex flex-col gap-4">
                       <Button
@@ -604,3 +597,6 @@ export default function LinguaCheckPage() {
     </div>
   );
 }
+
+
+    
