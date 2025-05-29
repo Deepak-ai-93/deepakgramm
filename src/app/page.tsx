@@ -50,13 +50,13 @@ export default function LinguaCheckPage() {
   const [parsedParagraphs, setParsedParagraphs] = useState<ParagraphCheckState[]>([]);
   const [isCheckingAll, setIsCheckingAll] = useState<boolean>(false);
 
-  const [isAiAssistanceEnabled, setIsAiAssistanceEnabled] = useState<true>(true);
+  const [isAiAssistanceEnabled, setIsAiAssistanceEnabled] = useState<boolean>(false); // Default to OFF
 
   const baseTitle = "Deepak Checker AI: AI-Powered Content Checker";
 
   useEffect(() => {
     if (isAiAssistanceEnabled) {
-      document.title = `🧠 ${baseTitle}`;
+      document.title = `D | ${baseTitle}`;
     } else {
       document.title = baseTitle;
     }
@@ -66,7 +66,6 @@ export default function LinguaCheckPage() {
     setSelectedLanguage(value as Language);
     setCheckContentResult(null);
     setUserModifiedText(null);
-    // Content suggestions will be re-fetched by useEffect if inputText and tone change.
     if (parsedParagraphs.length > 0) {
       setParsedParagraphs(prev => prev.map(p => ({ ...p, result: null, error: null, userModifiedText: null, isLoading: false })));
     }
@@ -74,12 +73,11 @@ export default function LinguaCheckPage() {
 
   const handleToneChange = (value: string) => {
     setSelectedTone(value === "none" ? undefined : value as Tone);
-    // Content suggestions will be re-fetched by useEffect if inputText is present
   };
 
   const handleCheckContent = async (textToCheck: string, isParagraph: boolean = false, paragraphId?: string) => {
     if (!isAiAssistanceEnabled) {
-      toast({ title: "AI Disabled", description: "AI assistance is currently disabled.", variant: "destructive" });
+      toast({ title: "AI Disabled", description: "AI assistance is currently disabled. Please enable it first.", variant: "destructive" });
       return;
     }
     if (!textToCheck.trim()) {
@@ -106,7 +104,7 @@ export default function LinguaCheckPage() {
       console.error("Error checking content:", error);
       const errorMsg = error instanceof Error ? error.message : "An unknown error occurred.";
       if (!isParagraph) {
-        setCheckContentResult({ correctedContent: textToCheck, suggestions: [] }); 
+        setCheckContentResult({ correctedContent: textToCheck, suggestions: [] });
         setUserModifiedText(textToCheck);
       } else {
         setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, isLoading: false, error: errorMsg, userModifiedText: textToCheck } : p));
@@ -120,15 +118,15 @@ export default function LinguaCheckPage() {
   const fetchSuggestions = useCallback(async (textToSuggest: string, showToast: boolean = false, applyTone: boolean = true) => {
     if (!isAiAssistanceEnabled || !textToSuggest.trim() || textToSuggest.split(/\s+/).filter(Boolean).length < MIN_WORDS_FOR_AUTO_SUGGEST) {
       setContentSuggestions([]);
-      if (isLoadingSuggest && !showToast) setIsLoadingSuggest(false); 
+      if (isLoadingSuggest && !showToast) setIsLoadingSuggest(false);
       return;
     }
     setIsLoadingSuggest(true);
     try {
-      const input: SuggestContentInput = { 
-        content: textToSuggest, 
-        language: selectedLanguage, 
-        tone: applyTone ? selectedTone : undefined 
+      const input: SuggestContentInput = {
+        content: textToSuggest,
+        language: selectedLanguage,
+        tone: applyTone ? selectedTone : undefined
       };
       const result = await suggestContent(input);
       setContentSuggestions(result.suggestions);
@@ -140,7 +138,7 @@ export default function LinguaCheckPage() {
       if (showToast) {
         toast({ title: "Error Fetching Suggestions", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
       }
-      setContentSuggestions([]); // Clear suggestions on error
+      setContentSuggestions([]);
     } finally {
       setIsLoadingSuggest(false);
     }
@@ -156,8 +154,7 @@ export default function LinguaCheckPage() {
         }
         timeout = setTimeout(() => resolve(func(...args)), waitFor);
       });
-    
-    // Add a cancel method to the debounced function
+
     (debouncedFunc as any).cancel = () => {
         if (timeout) {
             clearTimeout(timeout);
@@ -166,7 +163,7 @@ export default function LinguaCheckPage() {
     };
     return debouncedFunc as F & { cancel: () => void };
   };
-  
+
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedFetchSuggestions = useMemo(() => debounce(fetchSuggestions, AUTO_SUGGEST_DEBOUNCE_TIME), [fetchSuggestions]);
@@ -175,15 +172,15 @@ export default function LinguaCheckPage() {
     if (inputText.split(/\s+/).filter(Boolean).length >= MIN_WORDS_FOR_AUTO_SUGGEST && isAiAssistanceEnabled) {
       debouncedFetchSuggestions(inputText, false, true);
     } else {
-      debouncedFetchSuggestions.cancel(); // Cancel any pending debounced calls
-      setContentSuggestions([]); // Clear suggestions if conditions aren't met
-      if(isLoadingSuggest) setIsLoadingSuggest(false); // Ensure loading state is reset
+      debouncedFetchSuggestions.cancel();
+      setContentSuggestions([]);
+      if(isLoadingSuggest) setIsLoadingSuggest(false);
     }
     return () => {
-        debouncedFetchSuggestions.cancel(); // Cleanup on unmount
+        debouncedFetchSuggestions.cancel();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputText, isAiAssistanceEnabled, selectedLanguage, selectedTone]); // debouncedFetchSuggestions is stable
+  }, [inputText, isAiAssistanceEnabled, selectedLanguage, selectedTone]);
 
 
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -196,11 +193,11 @@ export default function LinguaCheckPage() {
       if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
         setUploadedFile(file);
         setIsUploading(true);
-        setParsedParagraphs([]); 
-        setCheckContentResult(null); 
+        setParsedParagraphs([]);
+        setCheckContentResult(null);
         setUserModifiedText(null);
         setContentSuggestions([]);
-        setInputText(""); 
+        setInputText("");
         toast({ title: "File Uploaded", description: `Processing ${file.name}...` });
         try {
           const arrayBuffer = await file.arrayBuffer();
@@ -225,7 +222,7 @@ export default function LinguaCheckPage() {
       } else {
         toast({ title: "Invalid File Type", description: "Please upload a .docx file.", variant: "destructive" });
         setUploadedFile(null);
-        event.target.value = ""; 
+        event.target.value = "";
       }
     }
   };
@@ -239,20 +236,19 @@ export default function LinguaCheckPage() {
     setIsCheckingAll(true);
     toast({ title: "Bulk Check Started", description: "Checking all unanalyzed paragraphs..." });
 
-    // Create a sequence of promises to run checks one by one
     let promiseChain = Promise.resolve();
     for (const para of parsedParagraphs) {
-      if (!para.result && !para.isLoading && !para.error) { 
+      if (!para.result && !para.isLoading && !para.error) {
         promiseChain = promiseChain.then(() => handleCheckContent(para.originalText, true, para.id));
       }
     }
-    
+
     await promiseChain;
 
     setIsCheckingAll(false);
     toast({ title: "Bulk Check Complete", description: "All paragraphs have been processed." });
   };
-  
+
   const handleUserModifiedTextChange = (newText: string) => {
     setUserModifiedText(newText);
   };
@@ -297,8 +293,13 @@ export default function LinguaCheckPage() {
                   onCheckedChange={(checked) => {
                     setIsAiAssistanceEnabled(checked);
                     if (!checked) {
-                      setContentSuggestions([]); 
+                      setContentSuggestions([]);
                       debouncedFetchSuggestions.cancel();
+                    } else {
+                      // If enabling and there's text, trigger suggestions
+                      if (inputText.split(/\s+/).filter(Boolean).length >= MIN_WORDS_FOR_AUTO_SUGGEST) {
+                        debouncedFetchSuggestions(inputText, false, true);
+                      }
                     }
                   }}
                   disabled={isLoadingCheck || isLoadingSuggest || isCheckingAll || isUploading}
@@ -331,7 +332,7 @@ export default function LinguaCheckPage() {
                 <Select
                   value={selectedTone || "none"}
                   onValueChange={handleToneChange}
-                  disabled={!isAiAssistanceEnabled || isLoadingSuggest}
+                  disabled={!isAiAssistanceEnabled || isLoadingSuggest || isLoadingCheck || isCheckingAll || isUploading}
                 >
                   <SelectTrigger id="tone-select" className="w-full md:w-[220px]">
                     <SelectValue placeholder="Select tone (optional)" />
@@ -348,14 +349,16 @@ export default function LinguaCheckPage() {
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="file-upload-coming-soon" className="flex items-center gap-1.5"><UploadCloud className="h-4 w-4"/> Upload DOCX File</Label>
-                <div
-                  id="file-upload-coming-soon"
-                  className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground"
-                  aria-live="polite"
-                >
-                  Feature coming soon!
-                </div>
+                <Label htmlFor="file-upload-input" className="flex items-center gap-1.5"><UploadCloud className="h-4 w-4"/> Upload DOCX File</Label>
+                <Input
+                  id="file-upload-input"
+                  type="file"
+                  accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={handleFileUpload}
+                  className="file:mr-2 file:rounded-md file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/20"
+                  disabled={!isAiAssistanceEnabled || isUploading || isLoadingCheck || isLoadingSuggest || isCheckingAll }
+                />
+                 {uploadedFile && <p className="text-xs text-muted-foreground">Selected: {uploadedFile.name}</p>}
               </div>
             </CardContent>
           </Card>
@@ -372,23 +375,23 @@ export default function LinguaCheckPage() {
                 value={inputText}
                 onChange={(e: ChangeEvent<HTMLTextAreaElement>) => {
                   setInputText(e.target.value);
-                  setCheckContentResult(null); 
+                  setCheckContentResult(null);
                   setUserModifiedText(null);
-                  if (uploadedFile) setUploadedFile(null); 
+                  if (uploadedFile) setUploadedFile(null);
                   if (parsedParagraphs.length > 0) setParsedParagraphs([]);
                 }}
                 className="flex-grow min-h-[200px] sm:min-h-[250px] text-base bg-card border-input focus:ring-primary"
                 rows={10}
-                disabled={!isAiAssistanceEnabled && parsedParagraphs.length > 0 && !inputText} 
+                disabled={parsedParagraphs.length > 0 && !inputText}
               />
               <div className="flex flex-col sm:flex-row gap-2">
                 <Button
-                  onClick={() => fetchSuggestions(inputText, true, false)} 
+                  onClick={() => fetchSuggestions(inputText, true, false)}
                   disabled={!canCheckOrSuggest || !inputText.trim()}
                   className="flex-1"
                   variant="outline"
                 >
-                  {isLoadingSuggest && !contentSuggestions.length && !debouncedFetchSuggestions.cancel ? <Loader2 className="animate-spin" /> : <Lightbulb />} {/* Show loader if manual fetch and no suggestions yet from auto */}
+                  {isLoadingSuggest && !contentSuggestions.length && !debouncedFetchSuggestions.cancel ? <Loader2 className="animate-spin" /> : <Lightbulb />}
                   Get General Suggestions
                 </Button>
                 <Button
@@ -402,7 +405,7 @@ export default function LinguaCheckPage() {
               </div>
             </CardContent>
           </Card>
-          
+
           {isAiAssistanceEnabled && (
             <Card className="shadow-lg border-border">
               <CardHeader>
@@ -429,9 +432,9 @@ export default function LinguaCheckPage() {
                   <ul className="list-disc pl-5 space-y-1 text-sm">
                     {contentSuggestions.map((suggestion, index) => (
                        <TypingSuggestionItem
-                        key={`${suggestion}-${index}-${selectedLanguage}-${selectedTone}`} // More unique key
+                        key={`${suggestion}-${index}-${selectedLanguage}-${selectedTone || 'general'}`}
                         suggestion={suggestion}
-                        initialDelay={index * 200} // Stagger suggestions
+                        initialDelay={index * 200}
                         typingSpeed={30}
                       />
                     ))}
@@ -459,15 +462,16 @@ export default function LinguaCheckPage() {
                  <CardDescription className="text-sm text-amber-500 flex items-center gap-1.5">
                     <AlertCircle className="h-4 w-4" /> AI assistance is currently disabled. Enable it from 'Input Options' to analyze content.
                  </CardDescription>
-              ) : ( // No specific condition for uploadedFile coming soon, as it won't populate parsedParagraphs
-                <CardDescription>Enter text in the manual input area and click 'Check Typed Text (Grammar)' to see results. DOCX upload is coming soon.</CardDescription>
+              ) : parsedParagraphs.length > 0 ? (
+                <CardDescription>Document paragraphs are listed below. Expand to preview. Click 'Check' or 'Check All' for AI analysis and editing.</CardDescription>
+              ) : (
+                <CardDescription>Enter text in the manual input area and click 'Check Typed Text (Grammar)' to see results. Or, upload a DOCX file.</CardDescription>
               )}
             </CardHeader>
             <CardContent className="flex-grow flex flex-col gap-4">
               {isAiAssistanceEnabled && (
                 <>
-                  {/* Results for Manual Input */}
-                  {checkContentResult && !uploadedFile && ( 
+                  {checkContentResult && !uploadedFile && parsedParagraphs.length === 0 && (
                     <Tabs defaultValue="interactive" className="w-full">
                       <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="interactive">Interactive Corrections</TabsTrigger>
@@ -475,10 +479,10 @@ export default function LinguaCheckPage() {
                       </TabsList>
                       <TabsContent value="interactive">
                         <InteractiveCorrector
-                          text={currentWorkingText} 
+                          text={currentWorkingText}
                           aiSuggestions={checkContentResult.suggestions || []}
                           onTextChange={(newText) => {
-                            setUserModifiedText(newText); 
+                            setUserModifiedText(newText);
                           }}
                         />
                       </TabsContent>
@@ -494,7 +498,6 @@ export default function LinguaCheckPage() {
                     </Tabs>
                   )}
 
-                  {/* Results for DOCX Upload - This section will not render if file upload is "coming soon" */}
                   {parsedParagraphs.length > 0 && (
                     <div className="flex flex-col gap-4">
                       <Button
@@ -522,7 +525,7 @@ export default function LinguaCheckPage() {
                                         size="sm"
                                         variant="outline"
                                         onClick={(e) => {
-                                          e.stopPropagation(); 
+                                          e.stopPropagation();
                                           if (!isCheckingAll && !para.isLoading) handleCheckContent(para.originalText, true, para.id);
                                         }}
                                         disabled={isCheckingAll || para.isLoading || !isAiAssistanceEnabled}
@@ -556,7 +559,7 @@ export default function LinguaCheckPage() {
                                   </TabsList>
                                   <TabsContent value="interactive-para">
                                     <InteractiveCorrector
-                                      text={para.userModifiedText ?? para.originalText} 
+                                      text={para.userModifiedText ?? para.originalText}
                                       aiSuggestions={para.result.suggestions || []}
                                       onTextChange={(newText) => handleParagraphUserModifiedTextChange(para.id, newText)}
                                       className="min-h-[100px]"
@@ -564,7 +567,7 @@ export default function LinguaCheckPage() {
                                   </TabsContent>
                                   <TabsContent value="corrected-para">
                                     <Textarea
-                                      value={para.userModifiedText ?? para.result.correctedContent} 
+                                      value={para.userModifiedText ?? para.result.correctedContent}
                                       onChange={(e) => handleParagraphUserModifiedTextChange(para.id, e.target.value)}
                                       className="min-h-[100px] text-sm bg-card border-input focus:ring-primary"
                                       rows={5}
@@ -597,6 +600,4 @@ export default function LinguaCheckPage() {
     </div>
   );
 }
-
-
     
