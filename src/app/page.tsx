@@ -1,25 +1,22 @@
 
 "use client";
 
-import { useState, useEffect, ChangeEvent } from 'react';
+import { useState, useEffect, ChangeEvent, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input"; // Keep for potential future re-enablement, though not used in current UI
+// import { Input } from "@/components/ui/input"; // Keep for potential future re-enablement
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"; // Removed CardFooter
+import { Accordion } from "@/components/ui/accordion"; // Keep for future
 import { InteractiveCorrector } from "@/components/linguacheck/InteractiveCorrector";
 import { checkContentErrors, CheckContentErrorsInput, CheckContentErrorsOutput } from "@/ai/flows/check-content-errors";
-import { suggestContent, SuggestContentInput, SuggestContentOutput } from "@/ai/flows/suggest-content-flow"; // Import new flow
+import { suggestContent, SuggestContentInput, SuggestContentOutput } from "@/ai/flows/suggest-content-flow";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LanguagesIcon, FileText, UploadCloud, FileCheck2, BrainCircuit, Lightbulb } from "lucide-react";
+import { Loader2, LanguagesIcon, FileText, UploadCloud, BrainCircuit, Lightbulb, FileCheck2 } from "lucide-react";
 import Image from 'next/image';
 import mammoth from 'mammoth'; // Keep for potential future re-enablement
 import { ScrollArea } from '@/components/ui/scroll-area';
-// Switch and Label are no longer used directly in the UI for AI toggle
-// import { Switch } from "@/components/ui/switch";
-// import { Label } from "@/components/ui/label";
 
 const languages = [
   { value: 'english', label: 'English' },
@@ -29,31 +26,52 @@ const languages = [
 
 type LanguageValue = typeof languages[number]['value'];
 
-interface ParagraphItem { // Keep for potential future re-enablement
+interface ParagraphItem {
   id: string;
   originalText: string;
   apiResponse?: CheckContentErrorsOutput;
   isLoading: boolean;
   userModifiedText: string;
+  previewText?: string; // Added for explicit preview before check
 }
 
 const BASE_PAGE_TITLE = 'Deepak Checker AI: AI-Powered Content Checker';
+const MIN_WORDS_FOR_AUTO_SUGGESTIONS = 5;
+const DEBOUNCE_DELAY = 1500; // 1.5 seconds
+
+// Simple debounce function
+function debounce<T extends (...args: any[]) => void>(func: T, delay: number) {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const debouncedFunction = (...args: Parameters<T>) => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    timeoutId = setTimeout(() => {
+      func(...args);
+    }, delay);
+  };
+  debouncedFunction.cancel = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+  };
+  return debouncedFunction;
+}
+
 
 export default function LinguaCheckPage() {
   const [inputText, setInputText] = useState<string>("");
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageValue>('english');
   
-  // States for grammar check
   const [isLoadingGrammar, setIsLoadingGrammar] = useState<boolean>(false);
   const [grammarApiResponse, setGrammarApiResponse] = useState<CheckContentErrorsOutput | null>(null);
   const [userModifiedText, setUserModifiedText] = useState<string>("");
 
-  // States for content suggestions
   const [isSuggestingContent, setIsSuggestingContent] = useState<boolean>(false);
   const [contentSuggestions, setContentSuggestions] = useState<string[] | null>(null);
 
-
-  // DOCX related states - keep for easier re-integration, but they won't be populated by UI
+  // DOCX related states are effectively unused with current UI
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [parsedParagraphs, setParsedParagraphs] = useState<ParagraphItem[]>([]);
   const [isFileProcessing, setIsFileProcessing] = useState<boolean>(false);
@@ -68,8 +86,7 @@ export default function LinguaCheckPage() {
   }, [inputText, grammarApiResponse]);
 
   useEffect(() => {
-    // AI assistance is now always on for manual input, so always show brain icon
-    document.title = '🧠 ' + BASE_PAGE_TITLE;
+    document.title = '🧠 ' + BASE_PAGE_TITLE; // AI is always on for manual input now
   }, []);
 
   const handleGrammarCheckSubmit = async () => {
@@ -84,12 +101,10 @@ export default function LinguaCheckPage() {
 
     setIsLoadingGrammar(true);
     setGrammarApiResponse(null);
-    setUserModifiedText(inputText); // Reset user modified text to current input before grammar check
-    // No longer resetting DOCX states as that UI is hidden
-    //setContentSuggestions(null); // Optionally clear content suggestions or keep them
-
+    setUserModifiedText(inputText); 
+    // contentSuggestions are not cleared here, user might want to see them alongside grammar
     try {
-      const input: CheckContentErrorsInput = { content: inputText, language: selectedLanguage };
+      const input: CheckContentErrorsInput = { content: userModifiedText, language: selectedLanguage }; // Use userModifiedText
       const result = await checkContentErrors(input);
       setGrammarApiResponse(result);
       if (result.correctedContent) {
@@ -97,7 +112,7 @@ export default function LinguaCheckPage() {
       }
       toast({
         title: "Grammar Check Complete",
-        description: "Errors and suggestions are now available for the text input.",
+        description: "Errors and suggestions are now available.",
       });
     } catch (error) {
       console.error("Error checking grammar:", error);
@@ -111,7 +126,69 @@ export default function LinguaCheckPage() {
     }
   };
 
-  const handleSuggestContentSubmit = async () => {
+  // Core logic for fetching suggestions, used by both manual button and debounced call
+  const fetchContentSuggestions = async (textToSuggestFor: string, lang: LanguageValue, showToastOnSuccess: boolean) => {
+    if (!textToSuggestFor.trim()) {
+      setContentSuggestions(null);
+      setIsSuggestingContent(false);
+      return;
+    }
+    setIsSuggestingContent(true);
+    // setContentSuggestions(null); // Clear previous ones immediately
+    // setGrammarApiResponse(null); // Clear grammar if getting new suggestions for the same text
+    
+    try {
+      const input: SuggestContentInput = { content: textToSuggestFor, language: lang };
+      const result = await suggestContent(input);
+      setContentSuggestions(result.suggestions);
+      if (showToastOnSuccess) {
+        toast({
+          title: "Content Suggestions Ready",
+          description: "AI has generated some content ideas for you.",
+        });
+      }
+    } catch (error) {
+      console.error("Error suggesting content:", error);
+      if (showToastOnSuccess) { // Only toast errors for manual button clicks to avoid noise
+        toast({
+          title: "Suggestion Error",
+          description: "Failed to get content suggestions. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setIsSuggestingContent(false);
+    }
+  };
+  
+  // Debounced version for "as-you-type"
+  const debouncedFetchSuggestions = useCallback(
+    debounce((text: string, lang: LanguageValue) => {
+      fetchContentSuggestions(text, lang, false); // No toast for automatic suggestions
+    }, DEBOUNCE_DELAY),
+    [selectedLanguage, toast] // Dependencies for useCallback
+  );
+
+  // Effect for "as-you-type" suggestions
+  useEffect(() => {
+    const trimmedText = inputText.trim();
+    if (trimmedText.split(/\s+/).length >= MIN_WORDS_FOR_AUTO_SUGGESTIONS) {
+      debouncedFetchSuggestions(inputText, selectedLanguage);
+    } else {
+      setContentSuggestions(null); // Clear suggestions if input is too short
+      if (isSuggestingContent && !isLoadingGrammar) { // Only clear if it was due to auto-suggest
+         // setIsSuggestingContent(false); // fetchContentSuggestions handles this
+      }
+      debouncedFetchSuggestions.cancel(); // Cancel any pending debounced call
+    }
+    return () => {
+      debouncedFetchSuggestions.cancel();
+    };
+  }, [inputText, selectedLanguage, debouncedFetchSuggestions, isSuggestingContent, isLoadingGrammar]);
+
+
+  // Handler for the manual "Get Content Suggestions" button
+  const handleSuggestContentButtonClick = async () => {
     if (!inputText.trim()) {
       toast({
         title: "Input Required",
@@ -120,176 +197,19 @@ export default function LinguaCheckPage() {
       });
       return;
     }
-    setIsSuggestingContent(true);
-    setContentSuggestions(null);
-    setGrammarApiResponse(null); // Clear previous grammar results if getting new suggestions
-    
-    try {
-      const input: SuggestContentInput = { content: inputText, language: selectedLanguage };
-      const result = await suggestContent(input);
-      setContentSuggestions(result.suggestions);
-      toast({
-        title: "Content Suggestions Ready",
-        description: "AI has generated some content ideas for you.",
-      });
-    } catch (error) {
-      console.error("Error suggesting content:", error);
-      toast({
-        title: "Error",
-        description: "Failed to get content suggestions. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSuggestingContent(false);
-    }
-  };
-
-
-  // DOCX related functions are kept for easier future re-integration but are not called by current UI
-  const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    // This function will not be called as the input is hidden
-    const file = event.target.files?.[0];
-    if (!file) return;
-    // ... (rest of the function remains, but unreachable through UI)
-    setIsFileProcessing(true);
-    setUploadedFileName(file.name);
-    setInputText(""); 
+    // Clear previous grammar results if getting new suggestions explicitly
     setGrammarApiResponse(null); 
-    setParsedParagraphs([]); 
-    setContentSuggestions(null);
-
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const result = await mammoth.convertToHtml({ arrayBuffer });
-      const html = result.value;
-
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = html;
-      const pElements = tempDiv.getElementsByTagName('p');
-
-      const paragraphs: ParagraphItem[] = Array.from(pElements)
-        .map((p, index) => ({
-          id: `para_${index}_${Date.now()}`,
-          originalText: p.textContent?.trim() || '',
-          isLoading: false,
-          userModifiedText: p.textContent?.trim() || '', 
-        }))
-        .filter(p => p.originalText.length > 0);
-
-      if (paragraphs.length === 0) {
-        toast({
-          title: "No Content Found",
-          description: "The uploaded DOCX file seems to be empty or contains no parsable paragraphs.",
-          variant: "destructive",
-        });
-        setUploadedFileName(null);
-      } else {
-        setParsedParagraphs(paragraphs);
-        toast({
-          title: "File Processed",
-          description: `Found ${paragraphs.length} paragraph(s) in ${file.name}. You can now check them.`,
-        });
-      }
-    } catch (error) {
-      console.error("Error processing DOCX file:", error);
-      toast({
-        title: "File Processing Error",
-        description: "Could not read or parse the DOCX file. Please ensure it's a valid .docx file.",
-        variant: "destructive",
-      });
-      setUploadedFileName(null);
-    } finally {
-      setIsFileProcessing(false);
-      event.target.value = ""; 
-    }
+    fetchContentSuggestions(inputText, selectedLanguage, true); // Show toast for manual button click
   };
 
-  const handleCheckParagraph = async (paragraphId: string) => {
-    // This function will not be called as the UI is hidden
-    const paragraphIndex = parsedParagraphs.findIndex(p => p.id === paragraphId);
-    if (paragraphIndex === -1) return;
-    // ... (rest of the function remains, but unreachable through UI)
-    const paragraph = parsedParagraphs[paragraphIndex];
-    
-    setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, isLoading: true, apiResponse: undefined } : p));
 
-    try {
-      const contentToCheck = paragraph.userModifiedText !== paragraph.originalText ? paragraph.userModifiedText : paragraph.originalText;
-      const input: CheckContentErrorsInput = { content: contentToCheck, language: selectedLanguage };
-      const result = await checkContentErrors(input);
-      setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, isLoading: false, apiResponse: result, userModifiedText: result.correctedContent || contentToCheck } : p));
-      toast({
-        title: `Paragraph ${paragraphIndex + 1} Checked`,
-        description: "Errors and suggestions are available for this paragraph.",
-      });
-    } catch (error) {
-      console.error(`Error checking paragraph ${paragraphId}:`, error);
-      toast({
-        title: `Error Checking Paragraph ${paragraphIndex + 1}`,
-        description: "Failed to check this paragraph. Please try again.",
-        variant: "destructive",
-      });
-      setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, isLoading: false } : p));
-    }
-  };
+  // DOCX related functions remain for potential re-enablement but are not active
+  const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => { /* ... */ };
+  const handleCheckParagraph = async (paragraphId: string) => { /* ... */ };
+  const handleCheckAllParagraphs = async () => { /* ... */ };
+  const handleParagraphTextChange = (paragraphId: string, newText: string) => { /* ... */ };
 
-  const handleCheckAllParagraphs = async () => {
-    // This function will not be called as the UI is hidden
-    if (!parsedParagraphs.some(p => !p.apiResponse && !p.isLoading)) {
-      toast({
-        title: "All Checked",
-        description: "All paragraphs have already been checked or are currently being processed.",
-      });
-      return;
-    }
-    // ... (rest of the function remains, but unreachable through UI)
-    setIsCheckingAll(true);
-    toast({
-      title: "Processing All Paragraphs",
-      description: "Checking all unchecked paragraphs. This may take some time.",
-    });
-    
-    const paragraphsToCheck = [...parsedParagraphs];
-
-    for (const para of paragraphsToCheck) {
-        const currentParaState = parsedParagraphs.find(p => p.id === para.id); 
-        if (currentParaState && !currentParaState.apiResponse && !currentParaState.isLoading) {
-            setParsedParagraphs(prev => prev.map(p => p.id === para.id ? { ...p, isLoading: true, apiResponse: undefined } : p));
-            try {
-                const contentToCheck = currentParaState.userModifiedText !== currentParaState.originalText ? currentParaState.userModifiedText : currentParaState.originalText;
-                const input: CheckContentErrorsInput = { content: contentToCheck, language: selectedLanguage };
-                const result = await checkContentErrors(input);
-                setParsedParagraphs(prev => prev.map(p =>
-                    p.id === para.id ? { ...p, isLoading: false, apiResponse: result, userModifiedText: result.correctedContent || contentToCheck } : p
-                ));
-            } catch (error) {
-                console.error(`Error checking paragraph ${para.id} during 'Check All':`, error);
-                const paragraphIndexOriginal = paragraphsToCheck.findIndex(p => p.id === para.id);
-                toast({
-                    title: `Error Checking Paragraph ${paragraphIndexOriginal + 1}`,
-                    description: "Failed to check this paragraph. Skipping.",
-                    variant: "destructive",
-                });
-                setParsedParagraphs(prev => prev.map(p => p.id === para.id ? { ...p, isLoading: false } : p));
-            }
-        }
-    }
-
-    setIsCheckingAll(false);
-    toast({
-        title: "Processing Complete",
-        description: "All paragraphs have been processed.",
-    });
-  };
-
-  const handleParagraphTextChange = (paragraphId: string, newText: string) => {
-    // This function will not be called as the UI is hidden
-    setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, userModifiedText: newText } : p));
-  };
-
-  // Simplified as DOCX processing states are not triggered by UI
   const anyOperationInProgress = isLoadingGrammar || isFileProcessing || isCheckingAll || isSuggestingContent;
-
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background text-foreground font-sans">
@@ -312,7 +232,7 @@ export default function LinguaCheckPage() {
               <LanguagesIcon className="h-5 w-5 md:h-6 md:w-6 text-primary" />
               Input Options
             </CardTitle>
-            <CardDescription className="text-sm">Select language, paste text for AI suggestions & grammar checks.</CardDescription>
+            <CardDescription className="text-sm">Select language, then paste or type text for AI suggestions & grammar checks.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 flex-grow">
             
@@ -323,7 +243,7 @@ export default function LinguaCheckPage() {
               </div>
               <p className="text-sm text-primary font-medium">Document Upload & Analysis: Coming Soon!</p>
               <p className="text-xs text-muted-foreground mt-1">
-                AI-powered suggestions and checking for manually typed text (below) is currently active.
+                AI-powered suggestions (as you type) and grammar checking for manually entered text (below) are currently active.
               </p>
             </div>
             
@@ -350,26 +270,26 @@ export default function LinguaCheckPage() {
               <label htmlFor="manual-text-input" className="block text-sm font-medium text-muted-foreground mb-1">Enter Text Manually:</label>
               <Textarea
                 id="manual-text-input"
-                placeholder="Start typing or paste your content here..."
+                placeholder="Start typing or paste your content here... (suggestions appear as you type)"
                 value={inputText}
                 onChange={(e) => { 
                   setInputText(e.target.value); 
                   setGrammarApiResponse(null); // Clear grammar results on new input
-                  setContentSuggestions(null); // Clear content suggestions on new input
-                  setUserModifiedText(e.target.value);
+                  setUserModifiedText(e.target.value); // Keep userModifiedText in sync
+                  // Content suggestions are handled by useEffect watching inputText
                 }}
                 className="flex-grow min-h-[150px] sm:min-h-[200px] text-base bg-card border-input focus:ring-primary"
                 rows={8}
-                disabled={anyOperationInProgress}
+                disabled={anyOperationInProgress && !isSuggestingContent} // Allow typing if only auto-suggesting
               />
               <div className="mt-3 flex flex-col sm:flex-row gap-2">
                 <Button 
-                  onClick={handleSuggestContentSubmit} 
+                  onClick={handleSuggestContentButtonClick} 
                   disabled={anyOperationInProgress || !inputText.trim()}
                   className="w-full sm:w-1/2 text-base py-3"
                   variant="outline"
                 >
-                  {isSuggestingContent ? (
+                  {isSuggestingContent && !isLoadingGrammar ? ( // Show loader only if it's for suggestions
                     <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                       Getting Suggestions...
@@ -398,10 +318,10 @@ export default function LinguaCheckPage() {
               </div>
             </div>
 
-            {isSuggestingContent && (
+            {isSuggestingContent && !isLoadingGrammar && ( // Show this only for suggestion loading, not grammar
                 <div className="flex items-center justify-center text-muted-foreground mt-4">
                     <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                    <p>Generating content ideas...</p>
+                    <p>AI is thinking of suggestions...</p>
                 </div>
             )}
 
@@ -427,8 +347,6 @@ export default function LinguaCheckPage() {
                 </CardContent>
               </Card>
             )}
-
-
           </CardContent>
         </Card>
 
@@ -447,7 +365,7 @@ export default function LinguaCheckPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-grow">
-            {(isLoadingGrammar && !grammarApiResponse) && (
+            {(isLoadingGrammar && !grammarApiResponse) && ( // This specific loader is for grammar check
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4">
                 <Loader2 className="h-10 w-10 md:h-12 md:w-12 animate-spin text-primary mb-4" />
                 <p className="text-md md:text-lg">Analyzing your text for grammar...</p>
@@ -455,22 +373,26 @@ export default function LinguaCheckPage() {
               </div>
             )}
             
-
-            {!isLoadingGrammar && !grammarApiResponse && !isFileProcessing && !isSuggestingContent && (!contentSuggestions || contentSuggestions.length === 0) && (
+            {!isLoadingGrammar && !grammarApiResponse && !isFileProcessing && (!isSuggestingContent || contentSuggestions === null || contentSuggestions.length === 0) && (
                <div className="flex flex-col items-center justify-center h-full text-center p-4 rounded-lg border-2 border-dashed border-input">
                  <Image src="https://placehold.co/200x150.png" alt="Placeholder illustration" width={200} height={150} className="opacity-60 rounded mb-4" data-ai-hint="analysis document" />
                  <p className="text-muted-foreground text-md md:text-lg">Your content analysis will show up here.</p>
-                 <p className="text-xs md:text-sm text-muted-foreground">Enter text and use the buttons on the left to get started.</p>
+                 <p className="text-xs md:text-sm text-muted-foreground">Enter text and use the buttons on the left to get started, or wait for automatic suggestions.</p>
                </div>
             )}
-             {!isLoadingGrammar && !grammarApiResponse && !isFileProcessing && !isSuggestingContent && contentSuggestions && contentSuggestions.length > 0 && (
+             {!isLoadingGrammar && !grammarApiResponse && !isFileProcessing && isSuggestingContent && (!contentSuggestions || contentSuggestions.length === 0) && ( // If suggesting but no suggestions yet
+                 <div className="flex flex-col items-center justify-center h-full text-center p-4 rounded-lg border-2 border-dashed border-input">
+                    <Image src="https://placehold.co/200x150.png" alt="Placeholder illustration" width={200} height={150} className="opacity-60 rounded mb-4" data-ai-hint="thinking lightbulb" />
+                    <p className="text-muted-foreground text-md md:text-lg">AI is generating suggestions for your text on the left...</p>
+                 </div>
+            )}
+             {!isLoadingGrammar && !grammarApiResponse && !isFileProcessing && !isSuggestingContent && contentSuggestions && contentSuggestions.length > 0 && ( // If suggestions are shown, but no grammar check yet
                  <div className="flex flex-col items-center justify-center h-full text-center p-4 rounded-lg border-2 border-dashed border-input">
                     <Image src="https://placehold.co/200x150.png" alt="Placeholder illustration" width={200} height={150} className="opacity-60 rounded mb-4" data-ai-hint="editing document" />
                     <p className="text-muted-foreground text-md md:text-lg">Review the content suggestions on the left.</p>
                     <p className="text-xs md:text-sm text-muted-foreground">After refining your text, click "Check Typed Text (Grammar)" to proceed.</p>
                  </div>
             )}
-
 
             {grammarApiResponse && (
               <Tabs defaultValue="interactive" className="w-full h-full flex flex-col">
@@ -479,8 +401,8 @@ export default function LinguaCheckPage() {
                   <TabsTrigger value="ai-corrected">Editable Corrected Text</TabsTrigger>
                 </TabsList>
                 <TabsContent value="interactive" className="flex-grow mt-4 overflow-y-auto">
-                  <InteractiveCorrector
-                    text={userModifiedText}
+                   <InteractiveCorrector
+                    text={userModifiedText} // Should be the text AI operated on or user further modified
                     aiSuggestions={grammarApiResponse.suggestions || []}
                     onTextChange={setUserModifiedText}
                     className="min-h-[200px] sm:min-h-[250px] md:min-h-[300px]"
