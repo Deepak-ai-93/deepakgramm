@@ -125,11 +125,7 @@ export default function LinguaCheckPage() {
       setContentSuggestions([]);
       return;
     }
-    if (inputText.trim().split(/\s+/).length < 1) { // Min 1 word for manual button click
-        setContentSuggestions([]);
-        return;
-    }
-
+    
     setIsLoadingSuggest(true);
     setContentSuggestions([]); 
     try {
@@ -377,15 +373,15 @@ export default function LinguaCheckPage() {
 
               <div className="grid gap-1.5">
                  <Label htmlFor="file-upload-input" className="flex items-center gap-1.5"><UploadCloud className="h-4 w-4"/> Upload DOCX File</Label>
-                 <Input
+                 {/* <Input
                     id="file-upload-input" 
                     type="file"
                     accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     onChange={handleFileUpload} 
                     className="file:mr-2 file:rounded-md file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/20"
                     disabled={!isAiAssistanceEnabled || isUploading || isLoadingCheck || isLoadingSuggest || isCheckingAll}
-                  />
-                 {/* <p className="text-xs text-amber-600">Feature coming soon! Use manual text input for now.</p> */}
+                  /> */}
+                 <p className="text-xs text-amber-600 p-2 border border-amber-500/50 rounded-md bg-amber-500/10">Feature coming soon! Use manual text input for now.</p>
               </div>
             </CardContent>
           </Card>
@@ -393,7 +389,7 @@ export default function LinguaCheckPage() {
           <Card className="shadow-xl border-border">
             <CardHeader>
               <CardTitle className="text-xl md:text-2xl">Enter Text Manually</CardTitle>
-              <CardDescription>Type or paste content. Click "Get Creative Suggestions" for tone-aware ideas. Then, check grammar and spelling.</CardDescription>
+              <CardDescription>Type or paste content. Click "Get Creative Suggestions" to analyze your text and receive enhanced, tone-aware ideas. Then, check grammar and spelling.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               <Textarea
@@ -454,7 +450,7 @@ export default function LinguaCheckPage() {
                 <CardDescription>
                   {parsedParagraphs.length > 0 
                     ? "Document paragraphs are listed below. Expand to preview. Click 'Check' or 'Check All' for AI analysis and editing."
-                    : "Enter text manually and click 'Check Typed Text (Grammar)' to see results. Or upload a DOCX file."}
+                    : "Enter text manually and click 'Check Typed Text (Grammar)' to see results. Or upload a DOCX file (feature coming soon!)."}
                 </CardDescription>
               )}
             </CardHeader>
