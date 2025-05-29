@@ -12,10 +12,12 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { InteractiveCorrector } from "@/components/linguacheck/InteractiveCorrector";
 import { checkContentErrors, CheckContentErrorsInput, CheckContentErrorsOutput } from "@/ai/flows/check-content-errors";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, BookText, LanguagesIcon, FileText, UploadCloud, FileCheck2 } from "lucide-react";
+import { Loader2, BookText, LanguagesIcon, FileText, UploadCloud, FileCheck2, BrainCircuit } from "lucide-react";
 import Image from 'next/image';
 import mammoth from 'mammoth';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 const languages = [
   { value: 'english', label: 'English' },
@@ -43,7 +45,8 @@ export default function LinguaCheckPage() {
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [parsedParagraphs, setParsedParagraphs] = useState<ParagraphItem[]>([]);
   const [isFileProcessing, setIsFileProcessing] = useState<boolean>(false);
-  const [isCheckingAll, setIsCheckingAll] = useState<boolean>(false); // New state for "Check All"
+  const [isCheckingAll, setIsCheckingAll] = useState<boolean>(false);
+  const [isAiAssistanceEnabled, setIsAiAssistanceEnabled] = useState<boolean>(true);
 
   const { toast } = useToast();
 
@@ -54,6 +57,14 @@ export default function LinguaCheckPage() {
   }, [inputText, apiResponse]);
 
   const handleMainSubmit = async () => {
+    if (!isAiAssistanceEnabled) {
+      toast({
+        title: "AI Assistance Disabled",
+        description: "Please enable AI assistance to check content.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!inputText.trim()) {
       toast({
         title: "Input Required",
@@ -67,13 +78,12 @@ export default function LinguaCheckPage() {
     setApiResponse(null);
     setParsedParagraphs([]);
     setUploadedFileName(null);
-    setUserModifiedText(inputText); // Initialize userModifiedText with the input
+    setUserModifiedText(inputText); 
 
     try {
       const input: CheckContentErrorsInput = { content: inputText, language: selectedLanguage };
       const result = await checkContentErrors(input);
       setApiResponse(result);
-      // Update userModifiedText with AI corrected content if available
       if (result.correctedContent) {
         setUserModifiedText(result.correctedContent);
       }
@@ -110,9 +120,9 @@ export default function LinguaCheckPage() {
 
     setIsFileProcessing(true);
     setUploadedFileName(file.name);
-    setInputText(""); // Clear manual input
-    setApiResponse(null); // Clear main API response
-    setParsedParagraphs([]); // Clear existing paragraphs
+    setInputText(""); 
+    setApiResponse(null); 
+    setParsedParagraphs([]); 
 
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -128,7 +138,7 @@ export default function LinguaCheckPage() {
           id: `para_${index}_${Date.now()}`,
           originalText: p.textContent?.trim() || '',
           isLoading: false,
-          userModifiedText: p.textContent?.trim() || '', // Initialize userModifiedText with original
+          userModifiedText: p.textContent?.trim() || '', 
         }))
         .filter(p => p.originalText.length > 0);
 
@@ -156,22 +166,27 @@ export default function LinguaCheckPage() {
       setUploadedFileName(null);
     } finally {
       setIsFileProcessing(false);
-      event.target.value = ""; // Reset file input
+      event.target.value = ""; 
     }
   };
 
   const handleCheckParagraph = async (paragraphId: string) => {
+    if (!isAiAssistanceEnabled) {
+        toast({
+            title: "AI Assistance Disabled",
+            description: "Please enable AI assistance to check this paragraph.",
+            variant: "destructive",
+        });
+        return;
+    }
     const paragraphIndex = parsedParagraphs.findIndex(p => p.id === paragraphId);
     if (paragraphIndex === -1) return;
 
     const paragraph = parsedParagraphs[paragraphIndex];
-    // Don't re-check if already loading or checked, unless explicitly needed
-    // if (paragraph.isLoading || paragraph.apiResponse) return; 
-
+    
     setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, isLoading: true, apiResponse: undefined } : p));
 
     try {
-      // Use userModifiedText if available and different from original, otherwise use originalText
       const contentToCheck = paragraph.userModifiedText !== paragraph.originalText ? paragraph.userModifiedText : paragraph.originalText;
       const input: CheckContentErrorsInput = { content: contentToCheck, language: selectedLanguage };
       const result = await checkContentErrors(input);
@@ -192,6 +207,14 @@ export default function LinguaCheckPage() {
   };
 
   const handleCheckAllParagraphs = async () => {
+    if (!isAiAssistanceEnabled) {
+      toast({
+        title: "AI Assistance Disabled",
+        description: "Please enable AI assistance to check all paragraphs.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!parsedParagraphs.some(p => !p.apiResponse && !p.isLoading)) {
       toast({
         title: "All Checked",
@@ -206,12 +229,10 @@ export default function LinguaCheckPage() {
       description: "Checking all unchecked paragraphs. This may take some time.",
     });
     
-    // Create a snapshot of paragraphs to iterate over to avoid issues with state updates during the loop
     const paragraphsToCheck = [...parsedParagraphs];
 
     for (const para of paragraphsToCheck) {
-        // Check the latest state of the paragraph before processing
-        const currentParaState = parsedParagraphs.find(p => p.id === para.id);
+        const currentParaState = parsedParagraphs.find(p => p.id === para.id); // Get latest state from the main state
         if (currentParaState && !currentParaState.apiResponse && !currentParaState.isLoading) {
             setParsedParagraphs(prev => prev.map(p => p.id === para.id ? { ...p, isLoading: true, apiResponse: undefined } : p));
             try {
@@ -246,11 +267,13 @@ export default function LinguaCheckPage() {
     setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, userModifiedText: newText } : p));
   };
 
+  const anyOperationInProgress = isLoading || isFileProcessing || isCheckingAll;
+
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background text-foreground font-sans">
       <header className="mb-6 md:mb-8 text-center">
         <div className="inline-flex items-center justify-center gap-2 md:gap-3">
-           <BookText className="h-10 w-10 md:h-12 md:w-12 text-primary" />
+           <BrainCircuit className="h-10 w-10 md:h-12 md:w-12 text-primary" />
           <h1 className="text-3xl md:text-5xl font-bold text-primary-foreground bg-primary px-3 py-1 md:px-4 md:py-2 rounded-lg shadow-md">
             Deepak Checker AI
           </h1>
@@ -267,11 +290,25 @@ export default function LinguaCheckPage() {
               <LanguagesIcon className="h-5 w-5 md:h-6 md:w-6 text-primary" />
               Input Options
             </CardTitle>
-            <CardDescription className="text-sm">Paste text or upload a DOCX file. Select language below.</CardDescription>
+            <CardDescription className="text-sm">Toggle AI, select language, then paste text or upload a DOCX file.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 flex-grow">
+            <div className="flex items-center space-x-2 mb-3 p-3 border rounded-md bg-card/30">
+              <Switch
+                id="ai-assistance-toggle"
+                checked={isAiAssistanceEnabled}
+                onCheckedChange={setIsAiAssistanceEnabled}
+                disabled={anyOperationInProgress}
+              />
+              <Label htmlFor="ai-assistance-toggle" className="text-sm font-medium">Enable AI Assistance</Label>
+            </div>
+            
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-center">
-                <Select value={selectedLanguage} onValueChange={(value: LanguageValue) => setSelectedLanguage(value)} disabled={isLoading || isFileProcessing || isCheckingAll}>
+                <Select 
+                  value={selectedLanguage} 
+                  onValueChange={(value: LanguageValue) => setSelectedLanguage(value)} 
+                  disabled={!isAiAssistanceEnabled || anyOperationInProgress}
+                >
                   <SelectTrigger className="w-full sm:w-auto sm:flex-grow-[0.5] bg-card border-input focus:ring-primary">
                     <SelectValue placeholder="Select language" />
                   </SelectTrigger>
@@ -294,9 +331,13 @@ export default function LinguaCheckPage() {
                 onChange={(e) => { setInputText(e.target.value); setUploadedFileName(null); setParsedParagraphs([]); setApiResponse(null); setUserModifiedText(e.target.value);}}
                 className="flex-grow min-h-[150px] sm:min-h-[200px] text-base bg-card border-input focus:ring-primary"
                 rows={8}
-                disabled={isFileProcessing || isCheckingAll}
+                disabled={anyOperationInProgress}
               />
-              <Button onClick={handleMainSubmit} disabled={isLoading || isFileProcessing || isCheckingAll || !inputText.trim()} className="w-full mt-3 text-base py-3">
+              <Button 
+                onClick={handleMainSubmit} 
+                disabled={!isAiAssistanceEnabled || anyOperationInProgress || !inputText.trim()} 
+                className="w-full mt-3 text-base py-3"
+              >
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -316,7 +357,7 @@ export default function LinguaCheckPage() {
                   type="file"
                   accept=".docx"
                   onChange={handleFileUpload}
-                  disabled={isFileProcessing || isLoading || isCheckingAll}
+                  disabled={anyOperationInProgress}
                   className="flex-grow file:mr-2 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer"
                 />
               </div>
@@ -341,22 +382,23 @@ export default function LinguaCheckPage() {
               {(uploadedFileName || parsedParagraphs.length > 0) ? <FileCheck2 className="h-6 w-6 text-primary"/> : <FileText className="h-6 w-6 text-primary"/>}
               Results & Corrections
             </CardTitle>
-            <CardDescription className="text-sm">
-            {
-                parsedParagraphs.length > 0
+             <CardDescription className="text-sm">
+              {!isAiAssistanceEnabled
+                ? "AI assistance is currently disabled. Enable it from 'Input Options' to analyze content."
+                : parsedParagraphs.length > 0
                   ? "Document paragraphs are listed below. Expand to preview its original content. Click 'Check' or 'Check All' for AI analysis and to enable editing tools."
                   : apiResponse
                     ? "Review suggestions or view and edit the corrected text from your manual input."
                     : "Results will appear here after checking content entered on the left, or after uploading and checking a DOCX file."
               }
-              {uploadedFileName && parsedParagraphs.length === 0 && !isFileProcessing && apiResponse === null && (
+              {isAiAssistanceEnabled && uploadedFileName && parsedParagraphs.length === 0 && !isFileProcessing && apiResponse === null && (
                 `Processed '${uploadedFileName}', but no paragraphs were found to display. Try a different file.`
               )}
             </CardDescription>
-            {parsedParagraphs.length > 0 && (
+            {isAiAssistanceEnabled && parsedParagraphs.length > 0 && (
               <Button
                 onClick={handleCheckAllParagraphs}
-                disabled={isLoading || isFileProcessing || isCheckingAll || !parsedParagraphs.some(p => !p.apiResponse && !p.isLoading)}
+                disabled={anyOperationInProgress || !parsedParagraphs.some(p => !p.apiResponse && !p.isLoading)}
                 className="mt-2 w-full sm:w-auto"
               >
                 {isCheckingAll ? (
@@ -379,7 +421,15 @@ export default function LinguaCheckPage() {
               </div>
             )}
 
-            {!isLoading && !apiResponse && parsedParagraphs.length === 0 && !isFileProcessing && (
+            {!isAiAssistanceEnabled && (
+                 <div className="flex flex-col items-center justify-center h-full text-center p-4 rounded-lg border-2 border-dashed border-input">
+                   <BrainCircuit className="h-16 w-16 text-muted-foreground opacity-50 mb-4" />
+                   <p className="text-muted-foreground text-md md:text-lg">AI Assistance is Disabled</p>
+                   <p className="text-xs md:text-sm text-muted-foreground">Enable AI assistance from the 'Input Options' panel to proceed.</p>
+                 </div>
+            )}
+
+            {isAiAssistanceEnabled && !isLoading && !apiResponse && parsedParagraphs.length === 0 && !isFileProcessing && (
                <div className="flex flex-col items-center justify-center h-full text-center p-4 rounded-lg border-2 border-dashed border-input">
                  <Image src="https://placehold.co/200x150.png" alt="Placeholder illustration" width={200} height={150} className="opacity-60 rounded mb-4" data-ai-hint="analysis document" />
                  <p className="text-muted-foreground text-md md:text-lg">Your content analysis will show up here.</p>
@@ -387,7 +437,7 @@ export default function LinguaCheckPage() {
                </div>
             )}
 
-            {apiResponse && parsedParagraphs.length === 0 && ( // Results for manual text input
+            {isAiAssistanceEnabled && apiResponse && parsedParagraphs.length === 0 && ( 
               <Tabs defaultValue="interactive" className="w-full h-full flex flex-col">
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="interactive">Interactive Corrections</TabsTrigger>
@@ -395,7 +445,7 @@ export default function LinguaCheckPage() {
                 </TabsList>
                 <TabsContent value="interactive" className="flex-grow mt-4 overflow-y-auto">
                   <InteractiveCorrector
-                    text={userModifiedText} // This is already the working text
+                    text={userModifiedText}
                     aiSuggestions={apiResponse.suggestions || []}
                     onTextChange={setUserModifiedText}
                     className="min-h-[200px] sm:min-h-[250px] md:min-h-[300px]"
@@ -403,7 +453,7 @@ export default function LinguaCheckPage() {
                 </TabsContent>
                 <TabsContent value="ai-corrected" className="flex-grow mt-4">
                   <Textarea
-                    value={userModifiedText} // Display userModifiedText (which was seeded by apiResponse.correctedContent)
+                    value={userModifiedText}
                     onChange={(e) => setUserModifiedText(e.target.value)}
                     className="h-full min-h-[200px] sm:min-h-[250px] md:min-h-[300px] text-base bg-card border-input focus:ring-primary"
                     rows={12}
@@ -412,7 +462,7 @@ export default function LinguaCheckPage() {
               </Tabs>
             )}
 
-            {parsedParagraphs.length > 0 && (
+            {isAiAssistanceEnabled && parsedParagraphs.length > 0 && (
               <ScrollArea className="h-[calc(100%-40px)] pr-3 mt-2"> 
                 <Accordion type="multiple" className="w-full space-y-2">
                   {parsedParagraphs.map((para, index) => (
@@ -437,7 +487,7 @@ export default function LinguaCheckPage() {
                                   e.stopPropagation(); 
                                   handleCheckParagraph(para.id);
                                 }}
-                                disabled={isFileProcessing || isCheckingAll || para.isLoading}
+                                disabled={!isAiAssistanceEnabled || anyOperationInProgress || para.isLoading}
                               >
                                 <span>Check</span>
                               </Button>
@@ -483,7 +533,10 @@ export default function LinguaCheckPage() {
                                 {para.originalText}
                               </div>
                               <p className="text-xs text-muted-foreground pt-1">
-                                Click the "Check" button (or "Check All Paragraphs" above) to analyze this paragraph for errors and enable editing.
+                                {isAiAssistanceEnabled 
+                                  ? 'Click the "Check" button (or "Check All Paragraphs" above) to analyze this paragraph for errors and enable editing.'
+                                  : "Enable AI Assistance from 'Input Options' to analyze this paragraph."
+                                }
                               </p>
                             </div>
                         )}
@@ -502,6 +555,4 @@ export default function LinguaCheckPage() {
     </div>
   );
 }
-    
-
     
