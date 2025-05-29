@@ -35,6 +35,8 @@ interface ParagraphItem {
   userModifiedText: string;
 }
 
+const BASE_PAGE_TITLE = 'Deepak Checker AI: AI-Powered Content Checker';
+
 export default function LinguaCheckPage() {
   const [inputText, setInputText] = useState<string>("");
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageValue>('english');
@@ -55,6 +57,15 @@ export default function LinguaCheckPage() {
       setUserModifiedText(inputText);
     }
   }, [inputText, apiResponse]);
+
+  useEffect(() => {
+    const aiEnabledPrefix = '🧠 ';
+    if (isAiAssistanceEnabled) {
+      document.title = aiEnabledPrefix + BASE_PAGE_TITLE;
+    } else {
+      document.title = BASE_PAGE_TITLE;
+    }
+  }, [isAiAssistanceEnabled]);
 
   const handleMainSubmit = async () => {
     if (!isAiAssistanceEnabled) {
@@ -555,4 +566,6 @@ export default function LinguaCheckPage() {
     </div>
   );
 }
+    
+
     
