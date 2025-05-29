@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { InteractiveCorrector } from "@/components/linguacheck/InteractiveCorrector";
+import { TypingSuggestionItem } from "@/components/linguacheck/TypingSuggestionItem"; // Import new component
 import { checkContentErrors, type CheckContentErrorsInput, type CheckContentErrorsOutput } from "@/ai/flows/check-content-errors";
 import { suggestContent, type SuggestContentInput, type SuggestContentOutput } from "@/ai/flows/suggest-content-flow";
 import mammoth from 'mammoth';
@@ -139,34 +140,50 @@ export default function LinguaCheckPage() {
       if (showToast) {
         toast({ title: "Error Fetching Suggestions", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
       }
-      setContentSuggestions([]);
+      setContentSuggestions([]); // Clear suggestions on error
     } finally {
       setIsLoadingSuggest(false);
     }
   }, [selectedLanguage, selectedTone, toast, isAiAssistanceEnabled, isLoadingSuggest]);
 
+
   const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
     let timeout: ReturnType<typeof setTimeout> | null = null;
-    return (...args: Parameters<F>): Promise<ReturnType<F>> =>
+    const debouncedFunc = (...args: Parameters<F>): Promise<ReturnType<F>> =>
       new Promise(resolve => {
         if (timeout) {
           clearTimeout(timeout);
         }
         timeout = setTimeout(() => resolve(func(...args)), waitFor);
       });
+    
+    // Add a cancel method to the debounced function
+    (debouncedFunc as any).cancel = () => {
+        if (timeout) {
+            clearTimeout(timeout);
+            timeout = null;
+        }
+    };
+    return debouncedFunc as F & { cancel: () => void };
   };
+  
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedFetchSuggestions = useMemo(() => debounce(fetchSuggestions, AUTO_SUGGEST_DEBOUNCE_TIME), [fetchSuggestions]);
 
   useEffect(() => {
-    if (inputText && isAiAssistanceEnabled) {
-      debouncedFetchSuggestions(inputText, false, true); 
+    if (inputText.split(/\s+/).filter(Boolean).length >= MIN_WORDS_FOR_AUTO_SUGGEST && isAiAssistanceEnabled) {
+      debouncedFetchSuggestions(inputText, false, true);
     } else {
-      setContentSuggestions([]);
-      if(isLoadingSuggest) setIsLoadingSuggest(false);
+      debouncedFetchSuggestions.cancel(); // Cancel any pending debounced calls
+      setContentSuggestions([]); // Clear suggestions if conditions aren't met
+      if(isLoadingSuggest) setIsLoadingSuggest(false); // Ensure loading state is reset
     }
+    return () => {
+        debouncedFetchSuggestions.cancel(); // Cleanup on unmount
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputText, isAiAssistanceEnabled, selectedLanguage, selectedTone]); 
+  }, [inputText, isAiAssistanceEnabled, selectedLanguage, selectedTone]); // debouncedFetchSuggestions is stable
 
 
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -222,11 +239,16 @@ export default function LinguaCheckPage() {
     setIsCheckingAll(true);
     toast({ title: "Bulk Check Started", description: "Checking all unanalyzed paragraphs..." });
 
+    // Create a sequence of promises to run checks one by one
+    let promiseChain = Promise.resolve();
     for (const para of parsedParagraphs) {
       if (!para.result && !para.isLoading && !para.error) { 
-        await handleCheckContent(para.originalText, true, para.id);
+        promiseChain = promiseChain.then(() => handleCheckContent(para.originalText, true, para.id));
       }
     }
+    
+    await promiseChain;
+
     setIsCheckingAll(false);
     toast({ title: "Bulk Check Complete", description: "All paragraphs have been processed." });
   };
@@ -276,6 +298,7 @@ export default function LinguaCheckPage() {
                     setIsAiAssistanceEnabled(checked);
                     if (!checked) {
                       setContentSuggestions([]); 
+                      debouncedFetchSuggestions.cancel();
                     }
                   }}
                   disabled={isLoadingCheck || isLoadingSuggest || isCheckingAll || isUploading}
@@ -366,7 +389,7 @@ export default function LinguaCheckPage() {
                   className="flex-1"
                   variant="outline"
                 >
-                  {isLoadingSuggest && !contentSuggestions.length ? <Loader2 className="animate-spin" /> : <Lightbulb />}
+                  {isLoadingSuggest && !contentSuggestions.length && !debouncedFetchSuggestions.cancel ? <Loader2 className="animate-spin" /> : <Lightbulb />} {/* Show loader if manual fetch and no suggestions yet from auto */}
                   Get General Suggestions
                 </Button>
                 <Button
@@ -388,12 +411,12 @@ export default function LinguaCheckPage() {
                   <Lightbulb className="text-primary h-5 w-5"/> Content Suggestions
                 </CardTitle>
                 <CardDescription>
-                  {isLoadingSuggest && !contentSuggestions.length 
+                  {isLoadingSuggest && contentSuggestions.length === 0
                     ? "Looking for ways to improve your text..."
                     : contentSuggestions.length > 0
                     ? (selectedTone ? `Suggestions for your current text in a "${selectedTone}" tone:` : "Suggestions for your current text:")
                     : (currentInputWordCount < MIN_WORDS_FOR_AUTO_SUGGEST
-                       ? `Suggestions will appear here as you type (min ${MIN_WORDS_FOR_AUTO_SUGGEST} words${selectedTone ? ` in a "${selectedTone}" tone` : ''}).`
+                       ? `Suggestions for your full text will appear here as you type (min ${MIN_WORDS_FOR_AUTO_SUGGEST} words${selectedTone ? ` in a "${selectedTone}" tone` : ''}).`
                        : `No specific suggestions at this moment. Try typing more, adjusting your text, or changing the tone.`)}
                 </CardDescription>
               </CardHeader>
@@ -404,9 +427,14 @@ export default function LinguaCheckPage() {
                     Fetching suggestions...
                   </div>
                 ) : contentSuggestions.length > 0 ? (
-                  <ul className="list-disc pl-5 space-y-2 text-sm">
+                  <ul className="list-disc pl-5 space-y-1 text-sm">
                     {contentSuggestions.map((suggestion, index) => (
-                      <li key={index}>{suggestion}</li>
+                       <TypingSuggestionItem
+                        key={`${suggestion}-${index}-${selectedLanguage}-${selectedTone}`} // More unique key
+                        suggestion={suggestion}
+                        initialDelay={index * 200} // Stagger suggestions
+                        typingSpeed={30}
+                      />
                     ))}
                   </ul>
                 ) : (
@@ -501,10 +529,10 @@ export default function LinguaCheckPage() {
                                         size="sm"
                                         variant="outline"
                                         onClick={(e) => {
-                                        e.stopPropagation(); 
-                                        if (!isCheckingAll && !para.isLoading) handleCheckContent(para.originalText, true, para.id);
+                                          e.stopPropagation(); 
+                                          if (!isCheckingAll && !para.isLoading) handleCheckContent(para.originalText, true, para.id);
                                         }}
-                                        disabled={isCheckingAll || para.isLoading}
+                                        disabled={isCheckingAll || para.isLoading || !isAiAssistanceEnabled}
                                         className="ml-auto flex-shrink-0"
                                     >
                                         <span><CheckCircle2 className="mr-1 h-4 w-4"/>Check</span>
@@ -576,5 +604,3 @@ export default function LinguaCheckPage() {
     </div>
   );
 }
-
-    
