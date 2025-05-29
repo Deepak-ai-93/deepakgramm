@@ -4,7 +4,7 @@
 import { useState, useEffect, ChangeEvent } from 'react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input';
+import { Input } from "@/components/ui/input"; // Corrected this line
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -169,7 +169,7 @@ export default function LinguaCheckPage() {
       const result = await checkContentErrors(input);
       setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, isLoading: false, apiResponse: result, userModifiedText: result.correctedContent } : p));
       toast({
-        title: `Paragraph ${paragraphIndex + 1} Checked`,
+        title: `Paragraph ${index + 1} Checked`,
         description: "Errors and suggestions are available for this paragraph.",
       });
     } catch (error) {
@@ -413,4 +413,3 @@ export default function LinguaCheckPage() {
     </div>
   );
 }
-
