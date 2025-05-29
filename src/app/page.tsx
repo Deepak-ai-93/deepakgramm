@@ -51,7 +51,7 @@ export default function LinguaCheckPage() {
     if (!apiResponse || inputText === "") {
       setUserModifiedText(inputText);
     }
-  }, [inputText, apiResponse]); // Added apiResponse to dependencies
+  }, [inputText, apiResponse]);
 
   const handleMainSubmit = async () => {
     if (!inputText.trim()) {
@@ -67,13 +67,13 @@ export default function LinguaCheckPage() {
     setApiResponse(null);
     setParsedParagraphs([]);
     setUploadedFileName(null);
-    setUserModifiedText(inputText);
+    setUserModifiedText(inputText); // Initialize userModifiedText with the input
 
     try {
       const input: CheckContentErrorsInput = { content: inputText, language: selectedLanguage };
       const result = await checkContentErrors(input);
       setApiResponse(result);
-      // Update userModifiedText only if AI provides corrected content
+      // Update userModifiedText with AI corrected content if available
       if (result.correctedContent) {
         setUserModifiedText(result.correctedContent);
       }
@@ -110,9 +110,9 @@ export default function LinguaCheckPage() {
 
     setIsFileProcessing(true);
     setUploadedFileName(file.name);
-    setInputText("");
-    setApiResponse(null);
-    setParsedParagraphs([]);
+    setInputText(""); // Clear manual input
+    setApiResponse(null); // Clear main API response
+    setParsedParagraphs([]); // Clear existing paragraphs
 
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -128,7 +128,7 @@ export default function LinguaCheckPage() {
           id: `para_${index}_${Date.now()}`,
           originalText: p.textContent?.trim() || '',
           isLoading: false,
-          userModifiedText: p.textContent?.trim() || '',
+          userModifiedText: p.textContent?.trim() || '', // Initialize userModifiedText with original
         }))
         .filter(p => p.originalText.length > 0);
 
@@ -156,7 +156,7 @@ export default function LinguaCheckPage() {
       setUploadedFileName(null);
     } finally {
       setIsFileProcessing(false);
-      event.target.value = "";
+      event.target.value = ""; // Reset file input
     }
   };
 
@@ -165,14 +165,17 @@ export default function LinguaCheckPage() {
     if (paragraphIndex === -1) return;
 
     const paragraph = parsedParagraphs[paragraphIndex];
-    if (paragraph.isLoading || paragraph.apiResponse) return; // Don't re-check if already loading or checked
+    // Don't re-check if already loading or checked, unless explicitly needed
+    // if (paragraph.isLoading || paragraph.apiResponse) return; 
 
     setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, isLoading: true, apiResponse: undefined } : p));
 
     try {
-      const input: CheckContentErrorsInput = { content: paragraph.originalText, language: selectedLanguage };
+      // Use userModifiedText if available and different from original, otherwise use originalText
+      const contentToCheck = paragraph.userModifiedText !== paragraph.originalText ? paragraph.userModifiedText : paragraph.originalText;
+      const input: CheckContentErrorsInput = { content: contentToCheck, language: selectedLanguage };
       const result = await checkContentErrors(input);
-      setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, isLoading: false, apiResponse: result, userModifiedText: result.correctedContent } : p));
+      setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, isLoading: false, apiResponse: result, userModifiedText: result.correctedContent || contentToCheck } : p));
       toast({
         title: `Paragraph ${paragraphIndex + 1} Checked`,
         description: "Errors and suggestions are available for this paragraph.",
@@ -202,21 +205,27 @@ export default function LinguaCheckPage() {
       title: "Processing All Paragraphs",
       description: "Checking all unchecked paragraphs. This may take some time.",
     });
+    
+    // Create a snapshot of paragraphs to iterate over to avoid issues with state updates during the loop
+    const paragraphsToCheck = [...parsedParagraphs];
 
-    for (const para of parsedParagraphs) { // Use a copy of parsedParagraphs at the start of the loop
-        if (!para.apiResponse && !para.isLoading) {
+    for (const para of paragraphsToCheck) {
+        // Check the latest state of the paragraph before processing
+        const currentParaState = parsedParagraphs.find(p => p.id === para.id);
+        if (currentParaState && !currentParaState.apiResponse && !currentParaState.isLoading) {
             setParsedParagraphs(prev => prev.map(p => p.id === para.id ? { ...p, isLoading: true, apiResponse: undefined } : p));
             try {
-                const input: CheckContentErrorsInput = { content: para.originalText, language: selectedLanguage };
+                const contentToCheck = currentParaState.userModifiedText !== currentParaState.originalText ? currentParaState.userModifiedText : currentParaState.originalText;
+                const input: CheckContentErrorsInput = { content: contentToCheck, language: selectedLanguage };
                 const result = await checkContentErrors(input);
                 setParsedParagraphs(prev => prev.map(p =>
-                    p.id === para.id ? { ...p, isLoading: false, apiResponse: result, userModifiedText: result.correctedContent } : p
+                    p.id === para.id ? { ...p, isLoading: false, apiResponse: result, userModifiedText: result.correctedContent || contentToCheck } : p
                 ));
             } catch (error) {
                 console.error(`Error checking paragraph ${para.id} during 'Check All':`, error);
-                const paragraphIndex = parsedParagraphs.findIndex(p => p.id === para.id);
+                const paragraphIndexOriginal = paragraphsToCheck.findIndex(p => p.id === para.id);
                 toast({
-                    title: `Error Checking Paragraph ${paragraphIndex + 1}`,
+                    title: `Error Checking Paragraph ${paragraphIndexOriginal + 1}`,
                     description: "Failed to check this paragraph. Skipping.",
                     variant: "destructive",
                 });
@@ -231,6 +240,7 @@ export default function LinguaCheckPage() {
         description: "All paragraphs have been processed.",
     });
   };
+
 
   const handleParagraphTextChange = (paragraphId: string, newText: string) => {
     setParsedParagraphs(prev => prev.map(p => p.id === paragraphId ? { ...p, userModifiedText: newText } : p));
@@ -281,7 +291,7 @@ export default function LinguaCheckPage() {
                 id="manual-text-input"
                 placeholder="Start typing or paste your content here..."
                 value={inputText}
-                onChange={(e) => { setInputText(e.target.value); setUploadedFileName(null); setParsedParagraphs([]); setApiResponse(null);}}
+                onChange={(e) => { setInputText(e.target.value); setUploadedFileName(null); setParsedParagraphs([]); setApiResponse(null); setUserModifiedText(e.target.value);}}
                 className="flex-grow min-h-[150px] sm:min-h-[200px] text-base bg-card border-input focus:ring-primary"
                 rows={8}
                 disabled={isFileProcessing || isCheckingAll}
@@ -332,8 +342,8 @@ export default function LinguaCheckPage() {
               Results & Corrections
             </CardTitle>
             <CardDescription className="text-sm">
-              {apiResponse || parsedParagraphs.length > 0 ? "Review suggestions or view the AI-corrected text." : "Results will appear here after checking."}
-              {uploadedFileName && parsedParagraphs.length === 0 && apiResponse === null && ` Showing results for: ${uploadedFileName}`}
+              {apiResponse || parsedParagraphs.length > 0 ? "Review suggestions or view and edit the corrected text." : "Results will appear here after checking."}
+              {uploadedFileName && parsedParagraphs.length === 0 && apiResponse === null && !isFileProcessing && `Processed: ${uploadedFileName}. Ready to check.`}
             </CardDescription>
             {parsedParagraphs.length > 0 && (
               <Button
@@ -369,15 +379,15 @@ export default function LinguaCheckPage() {
                </div>
             )}
 
-            {apiResponse && parsedParagraphs.length === 0 && (
+            {apiResponse && parsedParagraphs.length === 0 && ( // Results for manual text input
               <Tabs defaultValue="interactive" className="w-full h-full flex flex-col">
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="interactive">Interactive Corrections</TabsTrigger>
-                  <TabsTrigger value="ai-corrected">AI Corrected Text</TabsTrigger>
+                  <TabsTrigger value="ai-corrected">Editable Corrected Text</TabsTrigger>
                 </TabsList>
                 <TabsContent value="interactive" className="flex-grow mt-4 overflow-y-auto">
                   <InteractiveCorrector
-                    text={userModifiedText}
+                    text={userModifiedText} // This is already the working text
                     aiSuggestions={apiResponse.suggestions || []}
                     onTextChange={setUserModifiedText}
                     className="min-h-[200px] sm:min-h-[250px] md:min-h-[300px]"
@@ -385,9 +395,9 @@ export default function LinguaCheckPage() {
                 </TabsContent>
                 <TabsContent value="ai-corrected" className="flex-grow mt-4">
                   <Textarea
-                    readOnly
-                    value={apiResponse.correctedContent}
-                    className="h-full min-h-[200px] sm:min-h-[250px] md:min-h-[300px] text-base bg-card border-input focus:ring-0"
+                    value={userModifiedText} // Display userModifiedText (which was seeded by apiResponse.correctedContent)
+                    onChange={(e) => setUserModifiedText(e.target.value)}
+                    className="h-full min-h-[200px] sm:min-h-[250px] md:min-h-[300px] text-base bg-card border-input focus:ring-primary"
                     rows={12}
                   />
                 </TabsContent>
@@ -395,7 +405,7 @@ export default function LinguaCheckPage() {
             )}
 
             {parsedParagraphs.length > 0 && (
-              <ScrollArea className="h-[calc(100%-40px)] pr-3 mt-2"> {/* Adjusted height if Check All button is above */}
+              <ScrollArea className="h-[calc(100%-40px)] pr-3 mt-2"> 
                 <Accordion type="multiple" className="w-full space-y-2">
                   {parsedParagraphs.map((para, index) => (
                     <AccordionItem value={para.id} key={para.id} className="border bg-card/50 rounded-md shadow">
@@ -412,14 +422,14 @@ export default function LinguaCheckPage() {
                               <FileCheck2 className="h-5 w-5 text-green-500" />
                             ) : (
                               <Button
-                                asChild
+                                asChild // Ensures this doesn't render a <button> inside AccordionTrigger's <button>
                                 size="sm"
                                 variant="outline"
                                 onClick={(e) => {
-                                  e.stopPropagation();
+                                  e.stopPropagation(); // Prevent accordion from toggling
                                   handleCheckParagraph(para.id);
                                 }}
-                                disabled={isFileProcessing || isCheckingAll}
+                                disabled={isFileProcessing || isCheckingAll || para.isLoading}
                               >
                                 <span>Check</span>
                               </Button>
@@ -428,7 +438,7 @@ export default function LinguaCheckPage() {
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="px-4 pb-4 pt-0">
-                        {(para.isLoading && !para.apiResponse) && ( // Show loading indicator only if apiResponse is not yet there
+                        {(para.isLoading && !para.apiResponse) && (
                           <div className="flex items-center justify-center py-6">
                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
                             <p className="ml-2 text-muted-foreground">Checking paragraph...</p>
@@ -438,11 +448,11 @@ export default function LinguaCheckPage() {
                           <Tabs defaultValue="interactive" className="w-full mt-2">
                             <TabsList className="grid w-full grid-cols-2">
                               <TabsTrigger value="interactive">Interactive Corrections</TabsTrigger>
-                              <TabsTrigger value="ai-corrected">AI Corrected Text</TabsTrigger>
+                              <TabsTrigger value="ai-corrected">Editable Corrected Text</TabsTrigger>
                             </TabsList>
                             <TabsContent value="interactive" className="mt-2">
                               <InteractiveCorrector
-                                text={para.userModifiedText}
+                                text={para.userModifiedText} // This is the working text for the paragraph
                                 aiSuggestions={para.apiResponse.suggestions || []}
                                 onTextChange={(newText) => handleParagraphTextChange(para.id, newText)}
                                 className="min-h-[100px] bg-card border"
@@ -450,9 +460,9 @@ export default function LinguaCheckPage() {
                             </TabsContent>
                             <TabsContent value="ai-corrected" className="mt-2">
                               <Textarea
-                                readOnly
-                                value={para.apiResponse.correctedContent}
-                                className="min-h-[100px] text-base bg-card border-input focus:ring-0"
+                                value={para.userModifiedText} // Display and allow editing of userModifiedText
+                                onChange={(e) => handleParagraphTextChange(para.id, e.target.value)}
+                                className="min-h-[100px] text-base bg-card border-input focus:ring-primary"
                                 rows={5}
                               />
                             </TabsContent>
@@ -480,4 +490,3 @@ export default function LinguaCheckPage() {
     </div>
   );
 }
-
