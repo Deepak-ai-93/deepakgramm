@@ -66,7 +66,7 @@ export default function LinguaCheckPage() {
     setSelectedLanguage(value as Language);
     setCheckContentResult(null);
     setUserModifiedText(null);
-    setContentSuggestions([]); // Clear suggestions on language change
+    setContentSuggestions([]); 
     if (parsedParagraphs.length > 0) {
       setParsedParagraphs(prev => prev.map(p => ({ ...p, result: null, error: null, userModifiedText: null, isLoading: false })));
     }
@@ -74,7 +74,7 @@ export default function LinguaCheckPage() {
 
   const handleToneChange = (value: string) => {
     setSelectedTone(value === "none" ? undefined : value as Tone);
-    setContentSuggestions([]); // Clear suggestions on tone change for as-you-type
+    setContentSuggestions([]); 
   };
 
   const handleCheckContent = async (textToCheck: string, isParagraph: boolean = false, paragraphId?: string) => {
@@ -117,7 +117,7 @@ export default function LinguaCheckPage() {
     }
   };
 
-  const fetchSuggestions = useCallback(async (textToSuggest: string, applyTone: boolean = true) => {
+  const fetchSuggestions = useCallback(async (textToSuggest: string) => {
     if (!isAiAssistanceEnabled || !textToSuggest.trim() || textToSuggest.split(/\s+/).filter(Boolean).length < MIN_WORDS_FOR_AUTO_SUGGEST) {
       setContentSuggestions([]);
       if (isLoadingSuggest) setIsLoadingSuggest(false); 
@@ -128,7 +128,7 @@ export default function LinguaCheckPage() {
       const input: SuggestContentInput = {
         content: textToSuggest,
         language: selectedLanguage,
-        tone: applyTone ? selectedTone : undefined
+        tone: selectedTone
       };
       const result = await suggestContent(input);
       setContentSuggestions(result.suggestions);
@@ -165,7 +165,7 @@ export default function LinguaCheckPage() {
 
   useEffect(() => {
     if (inputText.split(/\s+/).filter(Boolean).length >= MIN_WORDS_FOR_AUTO_SUGGEST && isAiAssistanceEnabled) {
-      debouncedFetchSuggestions(inputText, true); // true for applyTone
+      debouncedFetchSuggestions(inputText);
     } else {
       debouncedFetchSuggestions.cancel();
       setContentSuggestions([]);
@@ -177,7 +177,7 @@ export default function LinguaCheckPage() {
         debouncedFetchSuggestions.cancel();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputText, isAiAssistanceEnabled, selectedLanguage, selectedTone]); // Add selectedLanguage and selectedTone dependencies
+  }, [inputText, isAiAssistanceEnabled, selectedLanguage, selectedTone]); 
 
 
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -187,7 +187,7 @@ export default function LinguaCheckPage() {
       return;
     }
     const file = event.target.files?.[0];
-    if (event.target) event.target.value = ""; // Reset file input
+    if (event.target) event.target.value = ""; 
 
     if (file) {
       if (file.type !== "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
@@ -196,7 +196,7 @@ export default function LinguaCheckPage() {
       }
       setUploadedFile(file);
       setIsUploading(true);
-      setInputText(""); // Clear manual input
+      setInputText(""); 
       setCheckContentResult(null);
       setUserModifiedText(null);
       setContentSuggestions([]);
@@ -273,12 +273,12 @@ export default function LinguaCheckPage() {
         {isLoadingSuggest && contentSuggestions.length === 0 ? (
           <div className="flex items-center justify-center text-muted-foreground">
             <Loader2 className="animate-spin h-5 w-5 mr-2" />
-            Fetching suggestions...
+            Fetching creative suggestions...
           </div>
         ) : contentSuggestions.length > 0 ? (
           <>
             <p className="text-sm text-muted-foreground mb-2 px-1">
-              {selectedTone ? `Suggestions (tone: "${selectedTone}") - click to apply:` : "Suggestions - click to apply:"}
+              {selectedTone ? `Creative suggestions (tone: "${selectedTone}") - click to apply:` : "Creative suggestions - click to apply:"}
             </p>
             <ul className="space-y-1 text-sm">
               {contentSuggestions.map((suggestion, index) => (
@@ -295,8 +295,8 @@ export default function LinguaCheckPage() {
         ) : (
           <p className="text-sm text-muted-foreground text-center px-1">
             {currentInputWordCount < MIN_WORDS_FOR_AUTO_SUGGEST
-              ? `Type at least ${MIN_WORDS_FOR_AUTO_SUGGEST} words for automatic, tone-aware suggestions for your full text.`
-              : "No specific suggestions at this moment. Keep typing, adjust your text, or try changing the tone."}
+              ? `Type at least ${MIN_WORDS_FOR_AUTO_SUGGEST} words for automatic, tone-aware creative suggestions for your text.`
+              : "No specific creative suggestions at this moment. Keep typing, adjust your text, or try changing the tone."}
           </p>
         )}
       </div>
@@ -340,13 +340,13 @@ export default function LinguaCheckPage() {
                       setContentSuggestions([]);
                       debouncedFetchSuggestions.cancel();
                       if (isLoadingSuggest) setIsLoadingSuggest(false);
-                      setParsedParagraphs([]); // Clear DOCX paragraphs
+                      setParsedParagraphs([]); 
                       setUploadedFile(null);
                       setCheckContentResult(null);
                       setUserModifiedText(null);
                     } else {
                       if (inputText.split(/\s+/).filter(Boolean).length >= MIN_WORDS_FOR_AUTO_SUGGEST) {
-                        debouncedFetchSuggestions(inputText, true);
+                        debouncedFetchSuggestions(inputText);
                       }
                     }
                   }}
@@ -376,7 +376,7 @@ export default function LinguaCheckPage() {
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="tone-select" className="flex items-center gap-1.5"><Wand2 className="h-4 w-4"/> Tone (for As-You-Type Suggestions)</Label>
+                <Label htmlFor="tone-select" className="flex items-center gap-1.5"><Wand2 className="h-4 w-4"/> Tone (for Creative & Social Media Suggestions)</Label>
                 <Select
                   value={selectedTone || "none"}
                   onValueChange={handleToneChange}
@@ -414,7 +414,7 @@ export default function LinguaCheckPage() {
           <Card className="shadow-xl border-border">
             <CardHeader>
               <CardTitle className="text-xl md:text-2xl">Enter Text Manually</CardTitle>
-              <CardDescription>Type or paste content. Tone-aware suggestions for your full text appear automatically below as you type (min {MIN_WORDS_FOR_AUTO_SUGGEST} words).</CardDescription>
+              <CardDescription>Type or paste content. Tone-aware creative suggestions for your full text (e.g., for social media) appear automatically below as you type (min {MIN_WORDS_FOR_AUTO_SUGGEST} words).</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               <Textarea
@@ -532,7 +532,7 @@ export default function LinguaCheckPage() {
                                   size="sm"
                                   variant="outline"
                                   onClick={(e) => {
-                                    e.stopPropagation(); // Prevent accordion from toggling
+                                    e.stopPropagation(); 
                                     handleCheckContent(para.originalText, true, para.id);
                                   }}
                                   disabled={!canCheckOrSuggest || para.isLoading || isCheckingAll}
@@ -613,6 +613,4 @@ export default function LinguaCheckPage() {
     </div>
   );
 }
-    
-
     
