@@ -344,7 +344,7 @@ export default function LinguaCheckPage() {
             <CardDescription className="text-sm">
             {
                 parsedParagraphs.length > 0
-                  ? "Document paragraphs are listed below. Expand to preview. Click 'Check' or 'Check All' for AI analysis and editing."
+                  ? "Document paragraphs are listed below. Expand to preview its original content. Click 'Check' or 'Check All' for AI analysis and to enable editing tools."
                   : apiResponse
                     ? "Review suggestions or view and edit the corrected text from your manual input."
                     : "Results will appear here after checking content entered on the left, or after uploading and checking a DOCX file."
@@ -421,7 +421,7 @@ export default function LinguaCheckPage() {
                         <div className="flex items-center gap-3 w-full">
                           <span className="font-semibold text-primary">{`Paragraph ${index + 1}`}</span>
                           <p className="text-sm text-muted-foreground truncate flex-grow text-left DDLM_IGNORED">
-                             {para.originalText.substring(0,80)}{para.originalText.length > 80 ? '...' : ''}
+                             {para.userModifiedText.substring(0,80)}{para.userModifiedText.length > 80 ? '...' : ''}
                           </p>
                           <div className="ml-auto flex-shrink-0">
                             {para.isLoading ? (
@@ -430,11 +430,11 @@ export default function LinguaCheckPage() {
                               <FileCheck2 className="h-5 w-5 text-green-500" />
                             ) : (
                               <Button
-                                asChild // Ensures this doesn't render a <button> inside AccordionTrigger's <button>
+                                asChild
                                 size="sm"
                                 variant="outline"
                                 onClick={(e) => {
-                                  e.stopPropagation(); // Prevent accordion from toggling
+                                  e.stopPropagation(); 
                                   handleCheckParagraph(para.id);
                                 }}
                                 disabled={isFileProcessing || isCheckingAll || para.isLoading}
@@ -460,7 +460,7 @@ export default function LinguaCheckPage() {
                             </TabsList>
                             <TabsContent value="interactive" className="mt-2">
                               <InteractiveCorrector
-                                text={para.userModifiedText} // This is the working text for the paragraph
+                                text={para.userModifiedText} 
                                 aiSuggestions={para.apiResponse.suggestions || []}
                                 onTextChange={(newText) => handleParagraphTextChange(para.id, newText)}
                                 className="min-h-[100px] bg-card border"
@@ -468,7 +468,7 @@ export default function LinguaCheckPage() {
                             </TabsContent>
                             <TabsContent value="ai-corrected" className="mt-2">
                               <Textarea
-                                value={para.userModifiedText} // Display and allow editing of userModifiedText
+                                value={para.userModifiedText} 
                                 onChange={(e) => handleParagraphTextChange(para.id, e.target.value)}
                                 className="min-h-[100px] text-base bg-card border-input focus:ring-primary"
                                 rows={5}
@@ -477,10 +477,14 @@ export default function LinguaCheckPage() {
                           </Tabs>
                         )}
                         {!para.isLoading && !para.apiResponse && (
-                            <div className="text-sm text-muted-foreground py-4 border-t mt-2">
-                                <p>Original Text:</p>
-                                <p className="whitespace-pre-wrap p-2 bg-background/30 rounded mt-1">{para.originalText}</p>
-                                Click "Check" to analyze this paragraph or "Check All Paragraphs" above.
+                            <div className="space-y-2 pt-2">
+                              <h4 className="font-semibold text-foreground">Preview: Original Paragraph Content</h4>
+                              <div className="whitespace-pre-wrap p-3 bg-muted/50 rounded-md border text-sm text-foreground">
+                                {para.originalText}
+                              </div>
+                              <p className="text-xs text-muted-foreground pt-1">
+                                Click the "Check" button (or "Check All Paragraphs" above) to analyze this paragraph for errors and enable editing.
+                              </p>
                             </div>
                         )}
                       </AccordionContent>
@@ -498,5 +502,6 @@ export default function LinguaCheckPage() {
     </div>
   );
 }
+    
 
     
