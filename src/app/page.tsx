@@ -342,8 +342,16 @@ export default function LinguaCheckPage() {
               Results & Corrections
             </CardTitle>
             <CardDescription className="text-sm">
-              {apiResponse || parsedParagraphs.length > 0 ? "Review suggestions or view and edit the corrected text." : "Results will appear here after checking."}
-              {uploadedFileName && parsedParagraphs.length === 0 && apiResponse === null && !isFileProcessing && `Processed: ${uploadedFileName}. Ready to check.`}
+            {
+                parsedParagraphs.length > 0
+                  ? "Document paragraphs are listed below. Expand to preview. Click 'Check' or 'Check All' for AI analysis and editing."
+                  : apiResponse
+                    ? "Review suggestions or view and edit the corrected text from your manual input."
+                    : "Results will appear here after checking content entered on the left, or after uploading and checking a DOCX file."
+              }
+              {uploadedFileName && parsedParagraphs.length === 0 && !isFileProcessing && apiResponse === null && (
+                `Processed '${uploadedFileName}', but no paragraphs were found to display. Try a different file.`
+              )}
             </CardDescription>
             {parsedParagraphs.length > 0 && (
               <Button
@@ -490,3 +498,5 @@ export default function LinguaCheckPage() {
     </div>
   );
 }
+
+    
