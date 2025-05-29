@@ -119,7 +119,7 @@ export default function LinguaCheckPage() {
   const fetchSuggestions = useCallback(async (textToSuggest: string, showToast: boolean = false, applyTone: boolean = true) => {
     if (!isAiAssistanceEnabled || !textToSuggest.trim() || textToSuggest.split(/\s+/).filter(Boolean).length < MIN_WORDS_FOR_AUTO_SUGGEST) {
       setContentSuggestions([]);
-      if (isLoadingSuggest && !showToast) setIsLoadingSuggest(false); // Clear loading if auto-suggest conditions not met
+      if (isLoadingSuggest && !showToast) setIsLoadingSuggest(false); 
       return;
     }
     setIsLoadingSuggest(true);
@@ -160,14 +160,13 @@ export default function LinguaCheckPage() {
 
   useEffect(() => {
     if (inputText && isAiAssistanceEnabled) {
-      // For as-you-type, apply tone is true
       debouncedFetchSuggestions(inputText, false, true); 
     } else {
       setContentSuggestions([]);
-      if(isLoadingSuggest) setIsLoadingSuggest(false); // Clear loading if conditions no longer met
+      if(isLoadingSuggest) setIsLoadingSuggest(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputText, isAiAssistanceEnabled, selectedLanguage, selectedTone]); // debouncedFetchSuggestions removed as it's stable
+  }, [inputText, isAiAssistanceEnabled, selectedLanguage, selectedTone]); 
 
 
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -184,7 +183,7 @@ export default function LinguaCheckPage() {
         setCheckContentResult(null); 
         setUserModifiedText(null);
         setContentSuggestions([]);
-        setInputText(""); // Clear manual input when a file is uploaded
+        setInputText(""); 
         toast({ title: "File Uploaded", description: `Processing ${file.name}...` });
         try {
           const arrayBuffer = await file.arrayBuffer();
@@ -276,7 +275,7 @@ export default function LinguaCheckPage() {
                   onCheckedChange={(checked) => {
                     setIsAiAssistanceEnabled(checked);
                     if (!checked) {
-                      setContentSuggestions([]); // Clear suggestions if AI is disabled
+                      setContentSuggestions([]); 
                     }
                   }}
                   disabled={isLoadingCheck || isLoadingSuggest || isCheckingAll || isUploading}
@@ -342,7 +341,7 @@ export default function LinguaCheckPage() {
           <Card className="shadow-xl border-border">
             <CardHeader>
               <CardTitle className="text-xl md:text-2xl">Enter Text Manually</CardTitle>
-              <CardDescription>Type or paste content. Tone-aware suggestions appear as you type (min {MIN_WORDS_FOR_AUTO_SUGGEST} words).</CardDescription>
+              <CardDescription>Type or paste content. Tone-aware suggestions for your full text appear automatically as you type (min {MIN_WORDS_FOR_AUTO_SUGGEST} words).</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               <Textarea
@@ -353,7 +352,7 @@ export default function LinguaCheckPage() {
                   setInputText(e.target.value);
                   setCheckContentResult(null); 
                   setUserModifiedText(null);
-                  if (uploadedFile) setUploadedFile(null); // Clear file if user starts typing manually
+                  if (uploadedFile) setUploadedFile(null); 
                   if (parsedParagraphs.length > 0) setParsedParagraphs([]);
                 }}
                 className="flex-grow min-h-[200px] sm:min-h-[250px] text-base bg-card border-input focus:ring-primary"
@@ -392,7 +391,7 @@ export default function LinguaCheckPage() {
                   {isLoadingSuggest && !contentSuggestions.length 
                     ? "Looking for ways to improve your text..."
                     : contentSuggestions.length > 0
-                    ? (selectedTone ? `Here are some suggestions in a "${selectedTone}" tone:` : "Here are some suggestions:")
+                    ? (selectedTone ? `Suggestions for your current text in a "${selectedTone}" tone:` : "Suggestions for your current text:")
                     : (currentInputWordCount < MIN_WORDS_FOR_AUTO_SUGGEST
                        ? `Suggestions will appear here as you type (min ${MIN_WORDS_FOR_AUTO_SUGGEST} words${selectedTone ? ` in a "${selectedTone}" tone` : ''}).`
                        : `No specific suggestions at this moment. Try typing more, adjusting your text, or changing the tone.`)}
@@ -413,7 +412,7 @@ export default function LinguaCheckPage() {
                 ) : (
                   <p className="text-sm text-muted-foreground text-center">
                     {currentInputWordCount < MIN_WORDS_FOR_AUTO_SUGGEST
-                      ? `Type at least ${MIN_WORDS_FOR_AUTO_SUGGEST} words for automatic suggestions.`
+                      ? `Type at least ${MIN_WORDS_FOR_AUTO_SUGGEST} words for automatic suggestions for your full text.`
                       : "No suggestions available right now. Keep typing or try the 'Get General Suggestions' button."}
                   </p>
                 )}
@@ -447,7 +446,7 @@ export default function LinguaCheckPage() {
               {isAiAssistanceEnabled && (
                 <>
                   {/* Results for Manual Input */}
-                  {checkContentResult && !uploadedFile && ( // Only show if no file is active
+                  {checkContentResult && !uploadedFile && ( 
                     <Tabs defaultValue="interactive" className="w-full">
                       <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="interactive">Interactive Corrections</TabsTrigger>
@@ -536,7 +535,7 @@ export default function LinguaCheckPage() {
                                   </TabsList>
                                   <TabsContent value="interactive-para">
                                     <InteractiveCorrector
-                                      text={para.userModifiedText ?? para.originalText} // Use original if no user modification
+                                      text={para.userModifiedText ?? para.originalText} 
                                       aiSuggestions={para.result.suggestions || []}
                                       onTextChange={(newText) => handleParagraphUserModifiedTextChange(para.id, newText)}
                                       className="min-h-[100px]"
@@ -544,7 +543,7 @@ export default function LinguaCheckPage() {
                                   </TabsContent>
                                   <TabsContent value="corrected-para">
                                     <Textarea
-                                      value={para.userModifiedText ?? para.result.correctedContent} // Fallback to AI corrected
+                                      value={para.userModifiedText ?? para.result.correctedContent} 
                                       onChange={(e) => handleParagraphUserModifiedTextChange(para.id, e.target.value)}
                                       className="min-h-[100px] text-sm bg-card border-input focus:ring-primary"
                                       rows={5}
