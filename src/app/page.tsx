@@ -243,7 +243,7 @@ export default function LinguaCheckPage() {
     const paragraphsToCheck = [...parsedParagraphs];
 
     for (const para of paragraphsToCheck) {
-        const currentParaState = parsedParagraphs.find(p => p.id === para.id); // Get latest state from the main state
+        const currentParaState = parsedParagraphs.find(p => p.id === para.id); 
         if (currentParaState && !currentParaState.apiResponse && !currentParaState.isLoading) {
             setParsedParagraphs(prev => prev.map(p => p.id === para.id ? { ...p, isLoading: true, apiResponse: undefined } : p));
             try {
@@ -394,14 +394,18 @@ export default function LinguaCheckPage() {
               Results & Corrections
             </CardTitle>
              <CardDescription className="text-sm">
-              {!isAiAssistanceEnabled
-                ? "AI assistance is currently disabled. Enable it from 'Input Options' to analyze content."
-                : parsedParagraphs.length > 0
-                  ? "Document paragraphs are listed below. Expand to preview its original content. Click 'Check' or 'Check All' for AI analysis and to enable editing tools."
-                  : apiResponse
-                    ? "Review suggestions or view and edit the corrected text from your manual input."
-                    : "Results will appear here after checking content entered on the left, or after uploading and checking a DOCX file."
-              }
+              {!isAiAssistanceEnabled ? (
+                <span className="flex items-center gap-1.5">
+                  <BrainCircuit className="h-4 w-4 text-muted-foreground opacity-70" /> 
+                  AI assistance is currently disabled. Enable it from 'Input Options' to analyze content.
+                </span>
+              ) : parsedParagraphs.length > 0 ? (
+                "Document paragraphs are listed below. Expand to preview its original content. Click 'Check' or 'Check All' for AI analysis and to enable editing tools."
+              ) : apiResponse ? (
+                "Review suggestions or view and edit the corrected text from your manual input."
+              ) : (
+                "Results will appear here after checking content entered on the left, or after uploading and checking a DOCX file."
+              )}
               {isAiAssistanceEnabled && uploadedFileName && parsedParagraphs.length === 0 && !isFileProcessing && apiResponse === null && (
                 `Processed '${uploadedFileName}', but no paragraphs were found to display. Try a different file.`
               )}
@@ -566,6 +570,8 @@ export default function LinguaCheckPage() {
     </div>
   );
 }
+    
+
     
 
     
