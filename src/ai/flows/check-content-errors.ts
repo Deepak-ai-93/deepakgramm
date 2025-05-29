@@ -1,3 +1,4 @@
+
 // 'use server';
 
 /**
@@ -37,7 +38,10 @@ const prompt = ai.definePrompt({
   name: 'checkContentErrorsPrompt',
   input: {schema: CheckContentErrorsInputSchema},
   output: {schema: CheckContentErrorsOutputSchema},
-  prompt: `You are a language expert. You will check the given content for spelling and grammatical errors in the specified language. Then provide corrected content and suggestions for each word having errors. The response must be in JSON format.
+  prompt: `You are an expert editor. Your goal is to help the user improve their writing. For the given content in the specified language:
+1. Provide a fully corrected version of the text that addresses issues in grammar, spelling, punctuation, clarity, conciseness, and overall flow. This will be the 'correctedContent'.
+2. For significant errors or areas of improvement, provide specific suggestions. Each suggestion should identify the original 'word' or short phrase from the input text and offer one or more 'suggestions' for how to improve it. These suggestions can go beyond simple spelling fixes and include rephrasing for clarity or conciseness.
+The response must be in JSON format according to the provided schema.
 
 Language: {{{language}}}
 Content: {{{content}}}
@@ -55,3 +59,4 @@ const checkContentErrorsFlow = ai.defineFlow(
     return output!;
   }
 );
+
