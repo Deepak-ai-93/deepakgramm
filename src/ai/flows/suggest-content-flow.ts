@@ -17,7 +17,24 @@ const SuggestContentInputSchema = z.object({
     .enum(['english', 'hindi', 'gujarati'])
     .describe('The language of the content.'),
   tone: z
-    .enum(['neutral', 'formal', 'casual', 'persuasive', 'creative', 'professional', 'medical_healthcare', 'financial_investment', 'technical'])
+    .enum([
+        'neutral', 
+        'formal', 
+        'casual', 
+        'persuasive', 
+        'creative', 
+        'professional', 
+        'medical_healthcare', 
+        'financial_investment', 
+        'technical',
+        'tips',
+        'explain',
+        'information',
+        'process',
+        'education',
+        'engaging',
+        'guide'
+    ])
     .optional()
     .describe('The desired tone for the content suggestions. If not provided, suggestions will be creatively neutral.'),
 });
@@ -41,9 +58,9 @@ const prompt = ai.definePrompt({
   input: {schema: SuggestContentInputSchema},
   output: {schema: SuggestContentOutputSchema},
   prompt: `You are a highly creative content generation assistant, specializing in crafting engaging social media posts and other creative text formats.
-Based on the provided text, language, {{#if tone}}and desired tone ({{{tone}}}), {{else}} {{/if}}generate an array of 3 to 5 distinct and creative suggestions to enhance, expand, or rephrase the content. It is crucial to provide multiple varied options.
+Based on the provided text, language, {{#if tone}}and desired style/tone ({{{tone}}}), {{else}} {{/if}}generate an array of 3 to 5 distinct and creative suggestions to enhance, expand, or rephrase the content. It is crucial to provide multiple varied options.
 
-If a specific tone is requested, ensure your suggestions strictly adhere to its characteristics:
+If a specific style/tone is requested, ensure your suggestions strictly adhere to its characteristics:
 - neutral: Impartial and objective language.
 - formal: Serious, official, and adhering to conventions.
 - casual: Relaxed, informal, and conversational.
@@ -53,6 +70,13 @@ If a specific tone is requested, ensure your suggestions strictly adhere to its 
 - medical_healthcare: Appropriate for health-related topics, using clear and respectful language, possibly incorporating relevant terminology. CRITICALLY IMPORTANT: DO NOT PROVIDE ANY MEDICAL ADVICE.
 - financial_investment: Suitable for discussing financial markets or investments, using appropriate terminology. CRITICALLY IMPORTANT: DO NOT PROVIDE ANY FINANCIAL ADVICE OR SPECIFIC INVESTMENT RECOMMENDATIONS.
 - technical: Precise and informative, suitable for explaining technical subjects, often using specific jargon.
+- tips: Provide actionable advice, short and practical suggestions, or helpful hints related to the content.
+- explain: Clearly break down a concept or process mentioned in the content, making it easier to understand.
+- information: Present key facts, data, or details related to the content in a straightforward and informative manner.
+- process: Describe steps or a sequence of actions relevant to the content, outlining how to achieve an outcome.
+- education: Impart knowledge, teach a concept from the content, or rephrase it as learning material.
+- engaging: Make the content more captivating, encourage interaction, or rephrase it to be more interesting.
+- guide: Provide step-by-step instructions based on the content or rephrase it as a helpful guide to lead a user through a task.
 
 Suggestions could include:
 - Catchy headlines or hooks for social media.
@@ -66,7 +90,7 @@ Aim for actionable, diverse, and inspiring suggestions. If the input seems like 
 
 Language: {{{language}}}
 {{#if tone}}
-Desired Tone: {{{tone}}}
+Desired Style/Tone: {{{tone}}}
 {{/if}}
 Original Text: {{{content}}}
 `,
@@ -83,4 +107,3 @@ const suggestContentFlow = ai.defineFlow(
     return output!;
   }
 );
-

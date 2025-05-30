@@ -20,7 +20,23 @@ import mammoth from 'mammoth';
 import { Type, UploadCloud, CheckCircle2, AlertCircle, BrainCircuit, Loader2, Lightbulb, Languages, FileCheck2, FileText, Wand2 } from "lucide-react";
 
 type Language = 'english' | 'hindi' | 'gujarati';
-type Tone = 'neutral' | 'formal' | 'casual' | 'persuasive' | 'creative' | 'professional' | 'medical_healthcare' | 'financial_investment' | 'technical';
+type Tone = 
+  | 'neutral' 
+  | 'formal' 
+  | 'casual' 
+  | 'persuasive' 
+  | 'creative' 
+  | 'professional' 
+  | 'medical_healthcare' 
+  | 'financial_investment' 
+  | 'technical'
+  | 'tips'
+  | 'explain'
+  | 'information'
+  | 'process'
+  | 'education'
+  | 'engaging'
+  | 'guide';
 
 
 interface ParagraphCheckState {
@@ -36,8 +52,10 @@ export default function LinguaCheckPage() {
   const [inputText, setInputText] = useState<string>("");
   const [selectedLanguage, setSelectedLanguage] = useState<Language>('english');
   const [selectedTone, setSelectedTone] = useState<Tone | undefined>(undefined);
+  
   const [isLoadingCheck, setIsLoadingCheck] = useState<boolean>(false);
   const [isLoadingSuggest, setIsLoadingSuggest] = useState<boolean>(false);
+  
   const [checkContentResult, setCheckContentResult] = useState<CheckContentErrorsOutput | null>(null);
   const [userModifiedText, setUserModifiedText] = useState<string | null>(null); // For main text area
   const [contentSuggestions, setContentSuggestions] = useState<string[]>([]);
@@ -231,19 +249,19 @@ export default function LinguaCheckPage() {
   const currentWorkingText = userModifiedText ?? inputText;
   const canCheckOrSuggest = isAiAssistanceEnabled && !isLoadingCheck && !isLoadingSuggest && !isCheckingAll && !isUploading;
 
-  const renderSuggestions = () => {
-    if (!isAiAssistanceEnabled && contentSuggestions.length === 0) return null;
+  const renderEnhancedSuggestions = () => {
+    if (!isAiAssistanceEnabled) return null;
 
     const suggestionMessage = () => {
-      if (selectedTone) return `Creative suggestions (tone: "${selectedTone}") - click to apply:`;
-      return "Creative suggestions - click to apply:";
+      if (selectedTone) return `Enhanced suggestions (style/tone: "${selectedTone}") - click to apply:`;
+      return "Enhanced suggestions - click to apply:";
     };
 
     if (isLoadingSuggest) {
       return (
         <div className="mt-3 mb-3 p-3 border rounded-md bg-card/50 min-h-[100px] flex flex-col justify-center items-center shadow">
           <Loader2 className="animate-spin h-5 w-5 mr-2 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Fetching creative suggestions...</p>
+          <p className="text-sm text-muted-foreground">Fetching enhanced suggestions...</p>
         </div>
       );
     }
@@ -269,11 +287,11 @@ export default function LinguaCheckPage() {
       );
     }
     
-    if (!isLoadingSuggest && contentSuggestions.length === 0 && isAiAssistanceEnabled) {
+    if (!isLoadingSuggest && contentSuggestions.length === 0 && inputText.trim().length > 0) {
          return (
             <div className="mt-3 mb-3 p-3 border rounded-md bg-card/50 min-h-[100px] flex flex-col justify-center items-center shadow">
                  <p className="text-sm text-muted-foreground text-center px-1">
-                    Click "Get Creative Suggestions" to generate ideas for your text.
+                    Click "Get Enhanced Suggestions" to generate ideas for your text.
                 </p>
             </div>
          );
@@ -304,7 +322,7 @@ export default function LinguaCheckPage() {
               <CardTitle className="text-xl md:text-2xl flex items-center gap-2">
                 <FileText className="h-5 w-5 md:h-6 md:w-6 text-primary" /> Input Options
               </CardTitle>
-              <CardDescription>Configure AI assistance, language, and tone.</CardDescription>
+              <CardDescription>Configure AI assistance, language, and content style/tone.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4 flex-grow">
               <div className="flex items-center space-x-2">
@@ -347,17 +365,17 @@ export default function LinguaCheckPage() {
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="tone-select" className="flex items-center gap-1.5"><Wand2 className="h-4 w-4"/> Tone (for Creative & Social Media Suggestions)</Label>
+                <Label htmlFor="tone-select" className="flex items-center gap-1.5"><Wand2 className="h-4 w-4"/> Content Style/Tone (for Enhanced Suggestions)</Label>
                 <Select
                   value={selectedTone || "none"}
                   onValueChange={handleToneChange}
                   disabled={!isAiAssistanceEnabled || isLoadingSuggest || isLoadingCheck || isCheckingAll || isUploading}
                 >
                   <SelectTrigger id="tone-select" className="w-full md:w-[220px]">
-                    <SelectValue placeholder="Select tone (optional)" />
+                    <SelectValue placeholder="Select style/tone (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">None (General)</SelectItem>
+                    <SelectItem value="none">None (General Creative)</SelectItem>
                     <SelectItem value="neutral">Neutral</SelectItem>
                     <SelectItem value="formal">Formal</SelectItem>
                     <SelectItem value="casual">Casual</SelectItem>
@@ -367,20 +385,19 @@ export default function LinguaCheckPage() {
                     <SelectItem value="medical_healthcare">Medical / Healthcare</SelectItem>
                     <SelectItem value="financial_investment">Financial / Investment</SelectItem>
                     <SelectItem value="technical">Technical</SelectItem>
+                    <SelectItem value="tips">Tips</SelectItem>
+                    <SelectItem value="explain">Explain</SelectItem>
+                    <SelectItem value="information">Information</SelectItem>
+                    <SelectItem value="process">Process</SelectItem>
+                    <SelectItem value="education">Education</SelectItem>
+                    <SelectItem value="engaging">Engaging</SelectItem>
+                    <SelectItem value="guide">Guide</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="grid gap-1.5">
                  <Label htmlFor="file-upload-input" className="flex items-center gap-1.5"><UploadCloud className="h-4 w-4"/> Upload DOCX File</Label>
-                 {/* <Input
-                    id="file-upload-input" 
-                    type="file"
-                    accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    onChange={handleFileUpload} 
-                    className="file:mr-2 file:rounded-md file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/20"
-                    disabled={!isAiAssistanceEnabled || isUploading || isLoadingCheck || isLoadingSuggest || isCheckingAll}
-                  /> */}
                  <p className="text-xs text-amber-600 p-2 border border-amber-500/50 rounded-md bg-amber-500/10">Feature coming soon! Use manual text input for now.</p>
               </div>
             </CardContent>
@@ -389,7 +406,7 @@ export default function LinguaCheckPage() {
           <Card className="shadow-xl border-border">
             <CardHeader>
               <CardTitle className="text-xl md:text-2xl">Enter Text Manually</CardTitle>
-              <CardDescription>Type or paste content. Click "Get Creative Suggestions" to analyze your text and receive enhanced, tone-aware ideas. Then, check grammar and spelling.</CardDescription>
+              <CardDescription>Type or paste content. Click "Get Enhanced Suggestions" to analyze your text and receive style/tone-aware ideas. Then, check grammar and spelling.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               <Textarea
@@ -409,7 +426,7 @@ export default function LinguaCheckPage() {
                 disabled={parsedParagraphs.length > 0 && !inputText} 
               />
               
-              {renderSuggestions()}
+              {renderEnhancedSuggestions()}
 
               <div className="flex flex-col sm:flex-row gap-2">
                  <Button
@@ -419,7 +436,7 @@ export default function LinguaCheckPage() {
                   variant="outline"
                 >
                   {isLoadingSuggest ? <Loader2 className="animate-spin" /> : <Lightbulb />}
-                  Get Creative Suggestions
+                  Get Enhanced Suggestions
                 </Button>
                 <Button
                   onClick={() => handleCheckContent(inputText)}
@@ -449,7 +466,7 @@ export default function LinguaCheckPage() {
               ) : (
                 <CardDescription>
                   {parsedParagraphs.length > 0 
-                    ? "Document paragraphs are listed below. Expand to preview. Click 'Check' or 'Check All' for AI analysis and editing."
+                    ? "Document paragraphs are listed below. Expand to preview. Click 'Check' or 'Check All' for AI analysis and editing. (File upload feature coming soon!)"
                     : "Enter text manually and click 'Check Typed Text (Grammar)' to see results. Or upload a DOCX file (feature coming soon!)."}
                 </CardDescription>
               )}
@@ -602,3 +619,4 @@ export default function LinguaCheckPage() {
   );
 }
     
+
