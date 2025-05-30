@@ -1,18 +1,18 @@
 
 'use server';
 /**
- * @fileOverview Flow for generating creative content suggestions, including for social media.
+ * @fileOverview Flow for generating a single, enhanced content suggestion.
  *
- * - suggestContent - A function that provides creative content suggestions.
+ * - suggestContent - A function that provides a single, enhanced content suggestion.
  * - SuggestContentInput - The input type for the suggestContent function.
- * - SuggestContentOutput - The return type for the suggestContent function.
+ * - SuggestContentOutput - The return type for the suggestContent function, containing one enhanced piece of content.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const SuggestContentInputSchema = z.object({
-  content: z.string().describe('The original content to get creative suggestions for.'),
+  content: z.string().describe('The original content to get an enhanced suggestion for.'),
   language: z
     .enum(['english', 'hindi', 'gujarati'])
     .describe('The language of the content.'),
@@ -36,15 +36,15 @@ const SuggestContentInputSchema = z.object({
         'guide'
     ])
     .optional()
-    .describe('The desired tone for the content suggestions. If not provided, suggestions will be creatively neutral.'),
+    .describe('The desired style/tone for the enhanced content. If not provided, the suggestion will be creatively neutral.'),
 });
 export type SuggestContentInput = z.infer<typeof SuggestContentInputSchema>;
 
 const SuggestContentOutputSchema = z.object({
-  suggestions: z
-    .array(z.string())
+  enhancedContent: z
+    .string()
     .describe(
-      'An array of creative content suggestions, aiming for 3 to 5 distinct items. Each suggestion should aim to enhance, expand, or rephrase the input text, matching the specified tone if provided. Examples include alternative phrasings, social media post ideas, or rewordings.'
+      'A single, high-quality, enhanced version of the input text, matching the specified style/tone if provided. This should be a complete, ready-to-use piece of content.'
     ),
 });
 export type SuggestContentOutput = z.infer<typeof SuggestContentOutputSchema>;
@@ -57,10 +57,10 @@ const prompt = ai.definePrompt({
   name: 'suggestContentPrompt',
   input: {schema: SuggestContentInputSchema},
   output: {schema: SuggestContentOutputSchema},
-  prompt: `You are a highly creative content generation assistant, specializing in crafting engaging social media posts and other creative text formats.
-Based on the provided text, language, {{#if tone}}and desired style/tone ({{{tone}}}), {{else}} {{/if}}generate an array of 3 to 5 distinct and creative suggestions to enhance, expand, or rephrase the content. It is crucial to provide multiple varied options.
+  prompt: `You are a highly creative content generation assistant, specializing in crafting engaging and polished text.
+Based on the provided text, language, {{#if tone}}and desired style/tone ({{{tone}}}), {{else}} {{/if}}generate **one single, best, enhanced version** of the content. This output should be a complete, ready-to-use piece of text.
 
-If a specific style/tone is requested, ensure your suggestions strictly adhere to its characteristics:
+If a specific style/tone is requested, ensure your suggestion strictly adheres to its characteristics:
 - neutral: Impartial and objective language.
 - formal: Serious, official, and adhering to conventions.
 - casual: Relaxed, informal, and conversational.
@@ -70,23 +70,15 @@ If a specific style/tone is requested, ensure your suggestions strictly adhere t
 - medical_healthcare: Appropriate for health-related topics, using clear and respectful language, possibly incorporating relevant terminology. CRITICALLY IMPORTANT: DO NOT PROVIDE ANY MEDICAL ADVICE.
 - financial_investment: Suitable for discussing financial markets or investments, using appropriate terminology. CRITICALLY IMPORTANT: DO NOT PROVIDE ANY FINANCIAL ADVICE OR SPECIFIC INVESTMENT RECOMMENDATIONS.
 - technical: Precise and informative, suitable for explaining technical subjects, often using specific jargon.
-- tips: Provide actionable advice, short and practical suggestions, or helpful hints related to the content.
-- explain: Clearly break down a concept or process mentioned in the content, making it easier to understand.
-- information: Present key facts, data, or details related to the content in a straightforward and informative manner.
-- process: Describe steps or a sequence of actions relevant to the content, outlining how to achieve an outcome.
-- education: Impart knowledge, teach a concept from the content, or rephrase it as learning material.
-- engaging: Make the content more captivating, encourage interaction, or rephrase it to be more interesting.
-- guide: Provide step-by-step instructions based on the content or rephrase it as a helpful guide to lead a user through a task.
+- tips: Provide actionable advice, short and practical suggestions, or helpful hints related to the content, formatted as a cohesive piece of text.
+- explain: Clearly break down a concept or process mentioned in the content, making it easier to understand, presented as a single coherent explanation.
+- information: Present key facts, data, or details related to the content in a straightforward and informative manner, as a single block of text.
+- process: Describe steps or a sequence of actions relevant to the content, outlining how to achieve an outcome, as a unified description.
+- education: Impart knowledge, teach a concept from the content, or rephrase it as learning material, in a single, coherent piece.
+- engaging: Make the content more captivating, encourage interaction, or rephrase it to be more interesting, as one enhanced text.
+- guide: Provide step-by-step instructions based on the content or rephrase it as a helpful guide to lead a user through a task, presented as a single, cohesive guide.
 
-Suggestions could include:
-- Catchy headlines or hooks for social media.
-- Alternative ways to phrase ideas for better engagement.
-- Ideas for calls to action.
-- Short social media post drafts based on the input.
-- Creative expansions or storytelling angles.
-- Suggestions for relevant hashtags (if appropriate for social media context and the input seems geared towards it).
-
-Aim for actionable, diverse, and inspiring suggestions. If the input seems like a topic, provide a few sample short posts or creative content ideas. Ensure you return an array of suggestions.
+The goal is to produce a single, high-quality piece of enhanced content. For example, if the input is a rough idea, the output should be a well-written paragraph or social media post.
 
 Language: {{{language}}}
 {{#if tone}}
