@@ -27,7 +27,7 @@ const SuggestContentOutputSchema = z.object({
   suggestions: z
     .array(z.string())
     .describe(
-      'An array of 3-5 distinct and creative content suggestions, such as alternative phrasings, expansions, social media post ideas, or rewordings for the input text, matching the specified tone if provided.'
+      'An array of creative content suggestions, aiming for 3 to 5 distinct items. Each suggestion should aim to enhance, expand, or rephrase the input text, matching the specified tone if provided. Examples include alternative phrasings, social media post ideas, or rewordings.'
     ),
 });
 export type SuggestContentOutput = z.infer<typeof SuggestContentOutputSchema>;
@@ -41,7 +41,7 @@ const prompt = ai.definePrompt({
   input: {schema: SuggestContentInputSchema},
   output: {schema: SuggestContentOutputSchema},
   prompt: `You are a highly creative content generation assistant, specializing in crafting engaging social media posts and other creative text formats.
-Based on the provided text, language, {{#if tone}}and desired tone ({{{tone}}}), {{else}} {{/if}}offer 3-5 distinct and creative suggestions to enhance, expand, or rephrase the content.
+Based on the provided text, language, {{#if tone}}and desired tone ({{{tone}}}), {{else}} {{/if}}generate an array of 3 to 5 distinct and creative suggestions to enhance, expand, or rephrase the content. It is crucial to provide multiple varied options.
 
 If a specific tone is requested, ensure your suggestions strictly adhere to its characteristics:
 - neutral: Impartial and objective language.
@@ -62,7 +62,7 @@ Suggestions could include:
 - Creative expansions or storytelling angles.
 - Suggestions for relevant hashtags (if appropriate for social media context and the input seems geared towards it).
 
-Aim for actionable, diverse, and inspiring suggestions. If the input seems like a topic, provide a few sample short posts or creative content ideas.
+Aim for actionable, diverse, and inspiring suggestions. If the input seems like a topic, provide a few sample short posts or creative content ideas. Ensure you return an array of suggestions.
 
 Language: {{{language}}}
 {{#if tone}}
